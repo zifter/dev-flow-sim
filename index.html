@@ -1,0 +1,871 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Симулятор потока разработки</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Модель workflow: люди против ИИ-агентов, пропускная способность и узкие места">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Unbounded:wght@600&display=swap">
+<style>
+/* Layout: пульт слева (поток задач, роли, этапы), справа вывод сверху вниз: вердикт → доска → графики → таблицы */
+:root {
+  --bg: #f4f4f0;
+  --surface: #fcfcfb;
+  --surface-2: #ecebe5;
+  --ink: #161614;
+  --ink-2: #52514e;
+  --muted: #7d7b75;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --line: rgba(11, 11, 11, 0.10);
+  --accent: #2a78d6;
+  --accent-ink: #1c5cab;
+  --a-col: #a3a198;
+  --b-col: #2a78d6;
+  --good-ink: #006300;
+  --crit: #d03b3b;
+  --crit-ink: #a32626;
+  --crit-bg: #fbeae8;
+  --warn: #fab219;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
+  --done: #c9c7bf;
+  --f-display: "Unbounded", "Golos Text", system-ui, sans-serif;
+  --f-body: "Golos Text", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f0f0e; --surface: #1a1a19; --surface-2: #262624; --ink: #f0efec; --ink-2: #c3c2b7;
+    --muted: #8f8d86; --grid: #2c2c2a; --axis: #45453f; --line: rgba(255, 255, 255, 0.10);
+    --accent: #3987e5; --accent-ink: #86b6ef; --a-col: #6d6b65; --b-col: #3987e5; --good-ink: #0ca30c;
+    --crit-ink: #f08a8a; --crit-bg: #3a1c1b;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767; --done: #45453f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f0f0e; --surface: #1a1a19; --surface-2: #262624; --ink: #f0efec; --ink-2: #c3c2b7;
+  --muted: #8f8d86; --grid: #2c2c2a; --axis: #45453f; --line: rgba(255, 255, 255, 0.10);
+  --accent: #3987e5; --accent-ink: #86b6ef; --a-col: #6d6b65; --b-col: #3987e5; --good-ink: #0ca30c;
+  --crit-ink: #f08a8a; --crit-bg: #3a1c1b;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767; --done: #45453f;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+.panel, main.out, aside.controls, .boards, .util, .u-bars { grid-template-columns: minmax(0, 1fr); }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink); font: 14px/1.5 var(--f-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 48px;
+}
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.num, input[type=number] { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+
+.page { max-width: 1440px; margin: 0 auto; display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
+header.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 24px; }
+header.top h1 { font: 600 clamp(20px, 2.4vw, 28px)/1.15 var(--f-display); letter-spacing: -0.01em; }
+header.top p { margin: 6px 0 0; color: var(--ink-2); max-width: 70ch; }
+.layout { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1100px) {
+  .layout { grid-template-columns: 400px minmax(0, 1fr); align-items: start; }
+  aside.controls { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; }
+}
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 14px; min-width: 0; }
+.panel > h2, .section-h { font: 600 13px/1.2 var(--f-body); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); }
+.hint { color: var(--muted); font-size: 12.5px; margin: 0; }
+aside.controls { display: grid; gap: 14px; }
+
+.field { display: grid; gap: 3px; min-width: 0; }
+.field > span { font-size: 12px; color: var(--ink-2); }
+input[type=text], input[type=number], select, textarea {
+  background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px; width: 100%; min-width: 0;
+}
+input[type=number] { font-size: 13px; }
+.row { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); }
+.row3 { display: grid; gap: 6px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.check { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; }
+.check input { margin-top: 3px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.seg button { border: 0; background: transparent; padding: 5px 10px; cursor: pointer; font-size: 13px; }
+.seg button[aria-pressed=true] { background: var(--ink); color: var(--bg); }
+
+.btn { border: 1px solid var(--line); background: var(--surface-2); border-radius: 6px; padding: 5px 10px; cursor: pointer; font-size: 13px; }
+.btn:hover { border-color: var(--axis); }
+.btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn.ghost { background: transparent; }
+.icon-btn { border: 0; background: transparent; cursor: pointer; padding: 2px 6px; border-radius: 4px; color: var(--ink-2); font-size: 14px; }
+.icon-btn:hover { background: var(--surface-2); color: var(--ink); }
+.btns { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.pool-row { display: grid; grid-template-columns: minmax(0, 1fr) 70px auto; gap: 6px; align-items: center; }
+
+.stage { border: 1px solid var(--line); border-radius: 8px; padding: 10px; display: grid; gap: 8px; background: var(--bg); }
+.stage-head { display: flex; gap: 6px; align-items: center; }
+.stage-head .sw { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.stage-head input { font-weight: 600; }
+.stage .agent { border-top: 1px dashed var(--axis); padding-top: 8px; display: grid; gap: 6px; }
+.stage .agent[data-on=false] .agent-body { display: none; }
+.sub { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+details.json summary { cursor: pointer; font-weight: 500; }
+details.json textarea { font: 12px/1.4 var(--f-mono); min-height: 220px; margin-top: 8px; }
+.msg { font-size: 12.5px; color: var(--ink-2); min-height: 1em; }
+.msg.err { color: var(--crit-ink); }
+
+main.out { display: grid; gap: 20px; min-width: 0; }
+
+/* Вердикт */
+.verdict { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 760px) { .verdict { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); } }
+.hero-num { font: 600 52px/1 var(--f-body); letter-spacing: -0.02em; }
+.hero-num small { display: block; margin-top: 6px; font-size: 15px; font-weight: 500; color: var(--ink-2); letter-spacing: 0; }
+.hero-cap { color: var(--ink-2); margin-top: 6px; }
+.shift { display: grid; gap: 10px; align-content: start; }
+.shift p { margin: 0; }
+.bn-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--crit-bg); color: var(--crit-ink); white-space: nowrap; }
+.bn-chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--crit); }
+.alert { border-radius: 8px; padding: 10px 12px; background: var(--crit-bg); color: var(--crit-ink); font-size: 13px; }
+.alert strong { color: inherit; }
+.tag { display: inline-block; font: 600 11px/1 var(--f-body); letter-spacing: 0.04em; text-transform: uppercase; padding: 4px 7px; border-radius: 4px; }
+.tag.a { background: var(--surface-2); color: var(--ink-2); }
+.tag.b { background: var(--accent); color: #fff; }
+
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; white-space: normal; }
+thead th { font-weight: 500; color: var(--ink-2); font-size: 12px; }
+td.num, th.num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.delta.good { color: var(--good-ink); }
+.delta.bad { color: var(--crit-ink); }
+.delta.flat { color: var(--muted); }
+
+/* Доска */
+.board-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; justify-content: space-between; }
+.player { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.player input[type=range] { width: min(320px, 60vw); accent-color: var(--accent); }
+.player select { width: auto; }
+input:disabled, select:disabled { opacity: 0.4; }
+.clock { font: 600 13px var(--f-mono); min-width: 15ch; }
+.boards { display: grid; gap: 14px; }
+.board-label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); }
+.board-scroll { overflow-x: auto; }
+.board { display: grid; gap: 6px; grid-template-columns: repeat(var(--cols), minmax(118px, 1fr)); }
+.col { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px; display: grid; gap: 6px; align-content: start; min-height: 132px; }
+.col.bn { border-color: var(--crit); }
+.col-h { display: grid; gap: 1px; }
+.col-h b { font-size: 13px; line-height: 1.25; }
+.col-h span { font-size: 11.5px; color: var(--muted); }
+.lane { display: grid; gap: 3px; }
+.lane-l { font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; }
+.lane-l .num { color: var(--ink-2); }
+.dots { display: flex; flex-wrap: wrap; gap: 3px; min-height: 9px; }
+.dot { width: 9px; height: 9px; border-radius: 2px; }
+.dot.w { border: 1.5px solid var(--ink-2); opacity: 0.7; }
+.more { font: 600 10.5px/9px var(--f-mono); color: var(--ink-2); }
+.done-n { font: 600 26px/1 var(--f-body); }
+
+/* Графики */
+.charts { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) { .charts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.chart { position: relative; min-width: 0; }
+.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.chart-title { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 4px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink-2); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); border-radius: 6px; padding: 7px 9px; font-size: 12px; min-width: 150px; z-index: 5; }
+.tip div { display: flex; justify-content: space-between; gap: 12px; }
+.tip .num { color: var(--ink); }
+.ax text { fill: var(--muted); font: 11px var(--f-mono); }
+.ax line { stroke: var(--grid); }
+.ax .base { stroke: var(--axis); }
+
+.util { display: grid; gap: 10px; }
+.u-row { display: grid; grid-template-columns: minmax(110px, 180px) minmax(0, 1fr); gap: 4px 12px; align-items: center; }
+.u-name { font-size: 13px; line-height: 1.25; }
+.u-name small { display: block; color: var(--muted); font-size: 11.5px; }
+.u-bars { display: grid; gap: 3px; position: relative; }
+.u-bar { display: flex; align-items: center; gap: 6px; height: 14px; }
+.u-fill { height: 12px; border-radius: 0 4px 4px 0; min-width: 2px; }
+.u-fill.a { background: var(--a-col); }
+.u-fill.b { background: var(--b-col); }
+.u-val { font: 11.5px var(--f-mono); color: var(--ink-2); white-space: nowrap; }
+.u-track { position: relative; }
+.u-100 { position: absolute; top: -2px; bottom: -2px; width: 0; border-left: 1px solid var(--axis); }
+@media (max-width: 520px) { .u-row { grid-template-columns: minmax(0, 1fr); } }
+
+footer { color: var(--muted); font-size: 12.5px; }
+footer a { color: var(--accent-ink); }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="top">
+    <div>
+      <h1>Симулятор потока разработки</h1>
+      <p>Опишите workflow как в Jira: этапы, роли и сколько часов занимает задача на каждом этапе. Сценарий A считает команду из людей, сценарий B — ту же команду, где часть этапов делают ИИ-агенты. Сравнение показывает пропускную способность и где копится очередь.</p>
+    </div>
+    <div class="btns">
+      <button class="btn" id="reseed" type="button" title="Тот же конфиг, другие случайные числа">Другой прогон</button>
+      <button class="btn ghost" id="reset" type="button">Вернуть пример</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="controls">
+      <section class="panel">
+        <h2>Поток задач</h2>
+        <div class="seg" role="group" aria-label="Режим генератора">
+          <button type="button" data-mode="flow" id="mode-flow">Постоянный поток</button>
+          <button type="button" data-mode="backlog" id="mode-backlog">Бэклог разом</button>
+        </div>
+        <div class="row">
+          <label class="field" data-show="flow"><span>Задач в неделю</span><input type="number" id="perWeek" min="0" step="0.5"></label>
+          <label class="field" data-show="backlog"><span>Задач в бэклоге</span><input type="number" id="backlog" min="0" step="1"></label>
+          <label class="field" data-show="flow"><span>Поток в B, ×</span><input type="number" id="multB" min="0" step="0.1"></label>
+        </div>
+        <div class="row">
+          <label class="field"><span>Горизонт, недель</span><input type="number" id="horizonWeeks" min="1" max="104" step="1"></label>
+          <label class="field" data-show="flow"><span>Разогрев, недель</span><input type="number" id="warmupWeeks" min="0" step="1"></label>
+          <label class="field"><span>Зерно</span><input type="number" id="seed" min="1" step="1"></label>
+        </div>
+        <div class="row">
+          <label class="field"><span>Часов в день</span><input type="number" id="hoursPerDay" min="1" max="24" step="0.5"></label>
+          <label class="field"><span>Дней в неделю</span><input type="number" id="daysPerWeek" min="1" max="7" step="1"></label>
+          <label class="field"><span>Доработка, % от оценки</span><input type="number" id="reworkFactor" min="0" step="5"></label>
+        </div>
+        <label class="check"><input type="checkbox" id="agents247"><span>Агенты работают 24/7, люди по рабочему календарю</span></label>
+        <label class="check"><input type="checkbox" id="downstreamFirst"><span>Сначала доводить начатое: роль берёт задачу с более позднего этапа</span></label>
+        <p class="hint">«Разогрев» не входит в метрики, пока система набирает задачи. «Доработка» — сколько стоит повторный проход этапа после возврата.</p>
+      </section>
+
+      <section class="panel">
+        <h2>Роли</h2>
+        <div id="pools" class="util"></div>
+        <div class="btns"><button class="btn" type="button" id="addPool">Добавить роль</button></div>
+      </section>
+
+      <section class="panel">
+        <h2>Этапы workflow</h2>
+        <p class="hint">Время — рабочие часы одного человека на задачу: минимум, типичное, максимум. Возврат отправляет задачу на более ранний этап. Агент включается только в сценарии B.</p>
+        <div id="stages" class="util"></div>
+        <div class="btns"><button class="btn" type="button" id="addStage">Добавить этап</button></div>
+      </section>
+
+      <section class="panel">
+        <details class="json">
+          <summary>Конфиг в JSON</summary>
+          <p class="hint">Скопируйте, чтобы сохранить свой workflow, или вставьте чужой и примените.</p>
+          <textarea id="json" spellcheck="false" aria-label="Конфиг в JSON"></textarea>
+          <div class="btns" style="margin-top:8px">
+            <button class="btn primary" type="button" id="applyJson">Применить</button>
+            <button class="btn" type="button" id="copyJson">Скопировать</button>
+          </div>
+          <div class="msg" id="jsonMsg"></div>
+        </details>
+      </section>
+    </aside>
+
+    <main class="out">
+      <section class="panel" id="verdict"></section>
+
+      <section class="panel">
+        <div class="board-head">
+          <h2 class="section-h">Доска</h2>
+          <div class="player">
+            <button class="btn primary" type="button" id="play">▶ Пуск</button>
+            <input type="range" id="scrub" min="0" max="0" value="0" aria-label="Время симуляции">
+            <select id="speed" aria-label="Скорость">
+              <option value="6">1 день/с</option>
+              <option value="18" selected>3 дня/с</option>
+              <option value="42">1 неделя/с</option>
+            </select>
+            <span class="clock" id="clock"></span>
+          </div>
+        </div>
+        <div class="boards" id="boards"></div>
+        <p class="hint">Контур — задача ждёт свободного исполнителя, заливка — в работе. Красная рамка — этап, упирающийся в самую загруженную роль.</p>
+      </section>
+
+      <section class="panel">
+        <div class="board-head">
+          <h2 class="section-h">Задачи на этапах во времени</h2>
+          <div class="seg" role="group" aria-label="Вид графика">
+            <button type="button" id="view-wip">В работе</button>
+            <button type="button" id="view-cfd">Накопительный (CFD)</button>
+          </div>
+        </div>
+        <div class="legend" id="legend"></div>
+        <div class="charts" id="charts"></div>
+        <p class="hint">Полоса этапа, которая расширяется со временем, — очередь перед узким местом. Клик по графику перематывает доску.</p>
+      </section>
+
+      <section class="panel">
+        <h2 class="section-h">Загрузка ролей</h2>
+        <div class="legend"><span><i style="background:var(--a-col)"></i>A — люди</span><span><i style="background:var(--b-col)"></i>B — с агентами</span></div>
+        <div class="util" id="util"></div>
+        <p class="hint">Доля доступного рабочего времени, занятая задачами. Выше 85% очередь растёт заметно, к 100% — без предела.</p>
+      </section>
+
+      <section class="panel">
+        <h2 class="section-h">Этапы</h2>
+        <div class="table-wrap" id="stageTable"></div>
+      </section>
+
+      <footer>Модель: дискретно-событийная симуляция, пуассоновский поток задач, треугольное распределение времени, FIFO-очереди с приоритетом поздних этапов. Предел пропускной способности считается аналитически по средней нагрузке на роль.</footer>
+    </main>
+  </div>
+</div>
+
+<script src="sim.js"></script>
+<script src="example.js"></script>
+<script>
+(function () {
+  'use strict';
+  const STORE = 'devflow-sim-cfg-v1';
+  const S = window.DevFlowSim;
+  const clone = o => JSON.parse(JSON.stringify(o));
+  const $ = (s, el) => (el || document).querySelector(s);
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const fmt = (x, d = 1) => (Number.isFinite(x) ? x.toLocaleString('ru-RU', { minimumFractionDigits: d, maximumFractionDigits: d }) : '—');
+  const pct = x => (Number.isFinite(x) ? Math.round(x * 100) + '%' : '∞');
+  const stageColor = i => `var(--s${(i % 8) + 1})`;
+  const uid = p => p + Math.random().toString(36).slice(2, 7);
+
+  let cfg = load();
+  let out = null;
+  let frame = 0, playing = false, lastTs = 0, view = 'wip';
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORE);
+      if (raw) { const c = JSON.parse(raw); if (c && c.stages && c.pools) return c; }
+    } catch (e) { /* хранилище недоступно */ }
+    return clone(window.DEVFLOW_EXAMPLE);
+  }
+  function save() { try { localStorage.setItem(STORE, JSON.stringify(cfg)); } catch (e) { /* без сохранения */ } }
+
+  // ---------- Пульт ----------
+  const scalarIds = ['perWeek', 'backlog', 'multB', 'horizonWeeks', 'warmupWeeks', 'seed', 'hoursPerDay', 'daysPerWeek', 'reworkFactor'];
+  function getScalar(id) { return ['perWeek', 'backlog', 'multB'].includes(id) ? cfg.arrival[id] : cfg[id]; }
+  function setScalar(id, v) { if (['perWeek', 'backlog', 'multB'].includes(id)) cfg.arrival[id] = v; else cfg[id] = v; }
+
+  function renderControls() {
+    scalarIds.forEach(id => { $('#' + id).value = getScalar(id); });
+    $('#agents247').checked = !!cfg.agents247;
+    $('#downstreamFirst').checked = !!cfg.downstreamFirst;
+    const mode = cfg.arrival.mode === 'backlog' ? 'backlog' : 'flow';
+    $('#mode-flow').setAttribute('aria-pressed', mode === 'flow');
+    $('#mode-backlog').setAttribute('aria-pressed', mode === 'backlog');
+    document.querySelectorAll('[data-show]').forEach(el => { el.hidden = el.dataset.show !== mode; });
+    renderPools();
+    renderStages();
+    $('#json').value = JSON.stringify(cfg, null, 2);
+  }
+
+  function poolOptions(sel) {
+    return cfg.pools.map(p => `<option value="${esc(p.id)}"${p.id === sel ? ' selected' : ''}>${esc(p.name)}</option>`).join('');
+  }
+
+  function renderPools() {
+    $('#pools').innerHTML = `<div class="pool-row hint"><span>Название</span><span>Человек</span><span></span></div>` + cfg.pools.map((p, i) => `
+      <div class="pool-row" data-pool="${i}">
+        <input type="text" id="pool-name-${esc(p.id)}" data-k="name" value="${esc(p.name)}" aria-label="Название роли">
+        <input type="number" id="pool-count-${esc(p.id)}" data-k="count" min="0" step="1" value="${p.count}" aria-label="Число людей">
+        <button class="icon-btn" type="button" data-act="del" title="Удалить роль" aria-label="Удалить роль"${cfg.pools.length < 2 ? ' disabled' : ''}>✕</button>
+      </div>`).join('');
+  }
+
+  function renderStages() {
+    const n = cfg.stages.length;
+    $('#stages').innerHTML = cfg.stages.map((s, i) => {
+      const earlier = cfg.stages.slice(0, i);
+      const rw = s.rework || { to: '', p: 20, pAgent: 25 };
+      const ag = s.agent || { on: false, speed: 10, count: 2, oversight: 1, oversightPool: s.pool };
+      const id = esc(s.id);
+      return `
+      <div class="stage" data-stage="${i}">
+        <div class="stage-head">
+          <span class="sw" style="background:${stageColor(i)}"></span>
+          <input type="text" id="st-name-${id}" data-k="name" value="${esc(s.name)}" aria-label="Название этапа">
+          <button class="icon-btn" type="button" data-act="up" title="Выше" aria-label="Выше"${i === 0 ? ' disabled' : ''}>↑</button>
+          <button class="icon-btn" type="button" data-act="down" title="Ниже" aria-label="Ниже"${i === n - 1 ? ' disabled' : ''}>↓</button>
+          <button class="icon-btn" type="button" data-act="del" title="Удалить этап" aria-label="Удалить этап"${n < 2 ? ' disabled' : ''}>✕</button>
+        </div>
+        <label class="field"><span>Кто делает</span><select id="st-pool-${id}" data-k="pool">${poolOptions(s.pool)}</select></label>
+        <div class="field"><span>Часов на задачу: мин · типично · макс</span>
+          <div class="row3">
+            <input type="number" id="st-min-${id}" data-k="min" min="0" step="0.25" value="${s.min}" aria-label="Минимум часов">
+            <input type="number" id="st-mode-${id}" data-k="mode" min="0" step="0.25" value="${s.mode}" aria-label="Типично часов">
+            <input type="number" id="st-max-${id}" data-k="max" min="0" step="0.25" value="${s.max}" aria-label="Максимум часов">
+          </div>
+        </div>
+        ${i > 0 ? `
+        <div class="field"><span>Возврат после этапа: куда · % · % если там агент</span>
+          <div class="row3">
+            <select id="st-rwto-${id}" data-k="rw.to" aria-label="Куда возвращать">
+              <option value="">нет</option>
+              ${earlier.map(e => `<option value="${esc(e.id)}"${e.id === rw.to ? ' selected' : ''}>${esc(e.name)}</option>`).join('')}
+            </select>
+            <input type="number" id="st-rwp-${id}" data-k="rw.p" min="0" max="99" step="1" value="${rw.p}" aria-label="Процент возвратов"${rw.to ? '' : ' disabled'}>
+            <input type="number" id="st-rwpa-${id}" data-k="rw.pAgent" min="0" max="99" step="1" value="${rw.pAgent ?? rw.p}" aria-label="Процент возвратов, если этап делал агент"${rw.to ? '' : ' disabled'}>
+          </div>
+        </div>` : ''}
+        <div class="agent" data-on="${!!ag.on}">
+          <label class="check"><input type="checkbox" id="st-agent-${id}" data-k="ag.on"${ag.on ? ' checked' : ''}><span>В сценарии B этап делает агент</span></label>
+          <div class="agent-body">
+            <div class="row3">
+              <label class="field"><span>Быстрее, ×</span><input type="number" id="st-agsp-${id}" data-k="ag.speed" min="0.1" step="0.5" value="${ag.speed}"></label>
+              <label class="field"><span>Агентов</span><input type="number" id="st-agn-${id}" data-k="ag.count" min="1" step="1" value="${ag.count}"></label>
+              <label class="field"><span>Проверка, ч</span><input type="number" id="st-agov-${id}" data-k="ag.oversight" min="0" step="0.25" value="${ag.oversight}"></label>
+            </div>
+            <label class="field"><span>Кто ставит задачу агенту и проверяет результат</span><select id="st-agpool-${id}" data-k="ag.oversightPool">${poolOptions(ag.oversightPool)}</select></label>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function onStageInput(e) {
+    const el = e.target, card = el.closest('[data-stage]');
+    if (!card || !el.dataset.k) return;
+    const s = cfg.stages[+card.dataset.stage];
+    const k = el.dataset.k;
+    const val = el.type === 'number' ? parseFloat(el.value) : el.type === 'checkbox' ? el.checked : el.value;
+    if (el.type === 'number' && !Number.isFinite(val)) return;
+    if (k.startsWith('rw.')) {
+      const f = k.slice(3);
+      if (f === 'to') {
+        s.rework = val ? Object.assign({ p: 20, pAgent: 25 }, s.rework || {}, { to: val }) : null;
+        renderStages();
+      } else if (s.rework) s.rework[f] = val;
+    } else if (k.startsWith('ag.')) {
+      s.agent = s.agent || { on: false, speed: 10, count: 2, oversight: 1, oversightPool: s.pool };
+      s.agent[k.slice(3)] = val;
+      if (k === 'ag.on') card.querySelector('.agent').dataset.on = String(val);
+    } else s[k] = val;
+    changed(k === 'name');
+  }
+
+  function onStageClick(e) {
+    const b = e.target.closest('[data-act]'), card = e.target.closest('[data-stage]');
+    if (!b || !card) return;
+    const i = +card.dataset.stage, st = cfg.stages;
+    if (b.dataset.act === 'up' && i > 0) [st[i - 1], st[i]] = [st[i], st[i - 1]];
+    if (b.dataset.act === 'down' && i < st.length - 1) [st[i + 1], st[i]] = [st[i], st[i + 1]];
+    if (b.dataset.act === 'del' && st.length > 1) st.splice(i, 1);
+    // Возврат допустим только на более ранний этап.
+    st.forEach((s, j) => { if (s.rework && st.findIndex(x => x.id === s.rework.to) >= j) s.rework = null; if (j === 0) s.rework = null; });
+    renderStages();
+    changed(true);
+  }
+
+  function onPoolInput(e) {
+    const el = e.target, row = el.closest('[data-pool]');
+    if (!row || !el.dataset.k) return;
+    const p = cfg.pools[+row.dataset.pool];
+    if (el.dataset.k === 'count') { const v = parseInt(el.value, 10); if (!Number.isFinite(v)) return; p.count = Math.max(0, v); }
+    else p.name = el.value;
+    if (el.dataset.k === 'name') renderStages();
+    changed(true);
+  }
+
+  function onPoolClick(e) {
+    const b = e.target.closest('[data-act=del]'), row = e.target.closest('[data-pool]');
+    if (!b || !row || cfg.pools.length < 2) return;
+    const [gone] = cfg.pools.splice(+row.dataset.pool, 1);
+    const fallback = cfg.pools[0].id;
+    cfg.stages.forEach(s => {
+      if (s.pool === gone.id) s.pool = fallback;
+      if (s.agent && s.agent.oversightPool === gone.id) s.agent.oversightPool = fallback;
+    });
+    renderPools(); renderStages();
+    changed(true);
+  }
+
+  let timer = null;
+  function changed(immediateLabels) {
+    save();
+    $('#json').value = JSON.stringify(cfg, null, 2);
+    clearTimeout(timer);
+    timer = setTimeout(run, immediateLabels ? 50 : 200);
+  }
+
+  // ---------- Прогон ----------
+  function run() {
+    const t0 = performance.now();
+    const A = S.simulate(cfg, 'A'), B = S.simulate(cfg, 'B');
+    const thA = S.analyze(cfg, 'A'), thB = S.analyze(cfg, 'B');
+    out = { A, B, thA, thB, ms: performance.now() - t0 };
+    const maxF = A.frames.length - 1;
+    $('#scrub').max = maxF;
+    if (frame > maxF) frame = maxF;
+    renderVerdict();
+    renderBoards();
+    renderCharts();
+    renderUtil();
+    renderStageTable();
+    setFrame(frame);
+  }
+
+  function poolLabel(th, key) { const p = th.pools.find(x => x.key === key); return p ? p.label : '—'; }
+  function weeksDays(h) { return h == null ? '—' : fmt(h / 24, 1) + ' дн'; }
+
+  function renderVerdict() {
+    const { A, B, thA, thB } = out;
+    const ratio = thB.maxTp / thA.maxTp;
+    const flow = A.mode === 'flow';
+    const over = th => th.pools.filter(p => p.rho != null && p.rho >= 1);
+    const alerts = [];
+    [['A', thA], ['B', thB]].forEach(([w, th]) => {
+      const o = over(th);
+      if (o.length) alerts.push(`<div class="alert"><strong>Сценарий ${w} перегружен.</strong> ${o.map(p => esc(p.label) + ' — ' + pct(p.rho)).join(', ')} от доступного времени. Очередь растёт без предела, сроки ниже не стабилизируются: уменьшите поток или добавьте людей.</div>`);
+    });
+    const moved = thA.bottleneck !== thB.bottleneck;
+    const bnA = poolLabel(thA, thA.bottleneck), bnB = poolLabel(thB, thB.bottleneck);
+    const pB = thB.pools.find(p => p.key === thB.bottleneck);
+    const relieved = thB.pools.filter(p => !p.agent).map(p => ({ p, a: thA.pools.find(x => x.key === p.key) }))
+      .filter(x => x.a && x.a.rho != null && x.a.rho - x.p.rho > 0.2);
+
+    const kpi = [
+      flow ? ['Поступает задач в неделю', A.perWeek, B.perWeek, 1, 0] : ['Задач в бэклоге', A.backlog, B.backlog, 0, 0],
+      ['Выполнено задач в неделю', A.throughput, B.throughput, 1, 1],
+      ['Предел системы, задач в неделю', thA.maxTp, thB.maxTp, 1, 1],
+      ['Срок задачи, медиана, дн', A.leadP50 / 24, B.leadP50 / 24, 1, -1],
+      ['Срок задачи, 85-й перцентиль, дн', A.leadP85 / 24, B.leadP85 / 24, 1, -1],
+      ['Задач в работе одновременно', A.wipAvg, B.wipAvg, 1, -1],
+      ['Эффективность потока (работа / срок)', A.flowEff * 100, B.flowEff * 100, 0, 1, '%'],
+      ['Возвратов на задачу', A.reworksPerTask, B.reworksPerTask, 2, -1],
+    ];
+    if (!flow) kpi.splice(1, 0, ['Бэклог разобран за, дн', A.drainT == null ? NaN : A.drainT / 24, B.drainT == null ? NaN : B.drainT / 24, 1, -1]);
+    const delta = (a, b, d, dir, unit) => {
+      if (!Number.isFinite(a) || !Number.isFinite(b) || dir === 0) return '<td class="num delta flat"></td>';
+      const diff = b - a;
+      if (Math.abs(diff) < Math.pow(10, -d) / 2 || Math.abs(diff) / Math.max(Math.abs(a), 1e-9) < 0.02) return '<td class="num delta flat">≈</td>';
+      const good = diff * dir > 0;
+      const rel = a !== 0 && !unit ? ` (×${fmt(b / a, 2)})` : '';
+      return `<td class="num delta ${good ? 'good' : 'bad'}">${diff > 0 ? '▲ +' : '▼ −'}${fmt(Math.abs(diff), d)}${unit || ''}${rel}</td>`;
+    };
+
+    $('#verdict').innerHTML = `
+      <h2>Итог</h2>
+      <div class="verdict">
+        <div>
+          <div class="hero-num">×${fmt(ratio, 2)} <small>к пределу пропускной способности</small></div>
+          <div class="hero-cap">Система без агентов выдержит до <b class="num">${fmt(thA.maxTp, 1)}</b> задач в неделю, с агентами — до <b class="num">${fmt(thB.maxTp, 1)}</b>. Больше упирается в самую загруженную роль.</div>
+        </div>
+        <div class="shift">
+          <p>${moved
+            ? `Узкое место сместилось: <span class="bn-chip">${esc(bnA)}</span> → <span class="bn-chip">${esc(bnB)}</span>`
+            : `Узкое место не изменилось: <span class="bn-chip">${esc(bnA)}</span>`}</p>
+          ${pB ? `<p>В B на одну задачу приходится <b class="num">${fmt(pB.load, 1)} ч</b> работы роли «${esc(pB.label)}»${pB.agent ? '' : ` (${pB.count} чел.)`}. Чтобы поднять предел, разгружайте именно её: больше людей, агент на этом этапе, меньше возвратов.</p>` : ''}
+          ${relieved.length ? `<p>Освободилось время: ${relieved.map(x => `${esc(x.p.label)} ${pct(x.a.rho)} → ${pct(x.p.rho)}`).join(', ')}.</p>` : ''}
+        </div>
+      </div>
+      ${alerts.join('')}
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Метрика</th><th><span class="tag a">A · люди</span></th><th><span class="tag b">B · с агентами</span></th><th>Разница</th></tr></thead>
+          <tbody>${kpi.map(([name, a, b, d, dir, unit]) => `<tr><td>${name}</td><td class="num">${fmt(a, d)}${unit || ''}</td><td class="num">${fmt(b, d)}${unit || ''}</td>${delta(a, b, d, dir, unit)}</tr>`).join('')}</tbody>
+        </table>
+      </div>
+      <p class="hint">Срок задачи — календарные дни от появления до «Готово». Метрики за ${fmt((A.T - A.W0) / 168, 0)} нед. после разогрева, прогон ${fmt(out.ms, 0)} мс.</p>`;
+  }
+
+  // ---------- Доска ----------
+  function renderBoards() {
+    const n = cfg.stages.length;
+    const row = (w, r, th) => `
+      <div>
+        <div class="board-label"><span class="tag ${w.toLowerCase()}">${w === 'A' ? 'A · люди' : 'B · с агентами'}</span></div>
+        <div class="board-scroll">
+          <div class="board" style="--cols:${n + 1}" data-board="${w}">
+            ${r.stages.map((s, i) => {
+              const st = cfg.stages[i];
+              const who = s.agentOn ? `агенты ×${st.agent.speed} · проверка: ${poolName(st.agent.oversightPool)}` : poolName(st.pool);
+              return `<div class="col${th.bottleneckStages[i] ? ' bn' : ''}">
+                <div class="col-h"><b>${esc(s.name)}</b><span>${esc(who)}</span></div>
+                <div class="lane"><div class="lane-l">ждут <span class="num" data-n="w${i}"></span></div><div class="dots" data-d="w${i}"></div></div>
+                <div class="lane"><div class="lane-l">в работе <span class="num" data-n="k${i}"></span></div><div class="dots" data-d="k${i}"></div></div>
+              </div>`;
+            }).join('')}
+            <div class="col"><div class="col-h"><b>Готово</b><span>с начала</span></div><div class="done-n num" data-n="done"></div></div>
+          </div>
+        </div>
+      </div>`;
+    $('#boards').innerHTML = row('A', out.A, out.thA) + row('B', out.B, out.thB);
+  }
+  function poolName(id) { const p = cfg.pools.find(x => x.id === id); return p ? p.name : '—'; }
+
+  const MAX_DOTS = 36;
+  function dotsHtml(count, cls, color) {
+    const shown = Math.min(count, MAX_DOTS);
+    let h = '';
+    for (let i = 0; i < shown; i++) h += cls === 'w' ? '<i class="dot w"></i>' : `<i class="dot" style="background:${color}"></i>`;
+    if (count > shown) h += `<span class="more">+${count - shown}</span>`;
+    return h;
+  }
+
+  function paintBoard(w, r) {
+    const f = r.frames[Math.min(frame, r.frames.length - 1)];
+    const el = document.querySelector(`[data-board="${w}"]`);
+    if (!el || !f) return;
+    f.w.forEach((c, i) => {
+      el.querySelector(`[data-n="w${i}"]`).textContent = c;
+      el.querySelector(`[data-n="k${i}"]`).textContent = f.k[i];
+      el.querySelector(`[data-d="w${i}"]`).innerHTML = dotsHtml(c, 'w');
+      el.querySelector(`[data-d="k${i}"]`).innerHTML = dotsHtml(f.k[i], 'k', stageColor(i));
+    });
+    el.querySelector('[data-n="done"]').textContent = f.done;
+  }
+
+  const DOW = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
+  function clockLabel(t) {
+    const d = t + 9; // рабочий день модели начинается в 9:00
+    const day = Math.floor(d / 24), hh = Math.floor(d % 24);
+    return `нед. ${Math.floor(day / 7) + 1} · ${DOW[day % 7]} ${String(hh).padStart(2, '0')}:00`;
+  }
+
+  function setFrame(i) {
+    if (!out) return;
+    frame = Math.max(0, Math.min(i, out.A.frames.length - 1));
+    $('#scrub').value = frame;
+    const t = out.A.frames[frame].t;
+    $('#clock').textContent = clockLabel(t);
+    paintBoard('A', out.A);
+    paintBoard('B', out.B);
+    document.querySelectorAll('.cursor').forEach(l => {
+      const x = +l.dataset.x0 + (t / out.A.T) * +l.dataset.w;
+      l.setAttribute('x1', x); l.setAttribute('x2', x);
+    });
+  }
+
+  function loop(ts) {
+    if (!playing) return;
+    const fps = +$('#speed').value; // кадр = 4 часа модели
+    if (!lastTs) lastTs = ts;
+    const adv = Math.floor((ts - lastTs) / 1000 * fps);
+    if (adv > 0) {
+      lastTs += adv * 1000 / fps;
+      if (frame + adv >= out.A.frames.length - 1) { setFrame(out.A.frames.length - 1); togglePlay(false); return; }
+      setFrame(frame + adv);
+    }
+    requestAnimationFrame(loop);
+  }
+  function togglePlay(on) {
+    playing = on == null ? !playing : on;
+    $('#play').textContent = playing ? '❚❚ Пауза' : '▶ Пуск';
+    if (playing) {
+      if (frame >= out.A.frames.length - 1) setFrame(0);
+      lastTs = 0; requestAnimationFrame(loop);
+    }
+  }
+
+  // ---------- Графики ----------
+  const CW = 560, CH = 230, M = { l: 38, r: 12, t: 10, b: 26 };
+  function niceMax(v) {
+    if (v <= 0) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(v))), m = v / p;
+    return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p;
+  }
+  function seriesOf(r) {
+    // Снизу вверх: (Готово), последний этап, ..., первый этап.
+    const n = r.stages.length;
+    return r.frames.map(f => {
+      const vals = [];
+      if (view === 'cfd') vals.push(f.done);
+      for (let i = n - 1; i >= 0; i--) vals.push(f.w[i] + f.k[i]);
+      return vals;
+    });
+  }
+  function bandColors(n) {
+    const c = [];
+    if (view === 'cfd') c.push('var(--done)');
+    for (let i = n - 1; i >= 0; i--) c.push(stageColor(i));
+    return c;
+  }
+  function bandNames(r) {
+    const c = [];
+    if (view === 'cfd') c.push('Готово');
+    for (let i = r.stages.length - 1; i >= 0; i--) c.push(r.stages[i].name);
+    return c;
+  }
+
+  function chartSvg(r, yMax) {
+    const pw = CW - M.l - M.r, ph = CH - M.t - M.b;
+    const T = r.T;
+    const X = t => M.l + (t / T) * pw, Y = v => M.t + ph - (v / yMax) * ph;
+    const series = seriesOf(r), colors = bandColors(r.stages.length);
+    const k = series[0] ? series[0].length : 0;
+    let paths = '';
+    const prev = r.frames.map(() => 0);
+    for (let b = 0; b < k; b++) {
+      const top = r.frames.map((f, i) => prev[i] + series[i][b]);
+      let d = '';
+      r.frames.forEach((f, i) => { d += (i ? 'L' : 'M') + X(f.t).toFixed(1) + ',' + Y(top[i]).toFixed(1); });
+      for (let i = r.frames.length - 1; i >= 0; i--) d += 'L' + X(r.frames[i].t).toFixed(1) + ',' + Y(prev[i]).toFixed(1);
+      paths += `<path d="${d}Z" fill="${colors[b]}" fill-opacity="${view === 'cfd' && b === 0 ? 1 : 0.85}" stroke="var(--surface)" stroke-width="0.6"/>`;
+      top.forEach((v, i) => { prev[i] = v; });
+    }
+    let ax = '';
+    const ticks = yMax % 5 === 0 ? 5 : 4;
+    for (let j = 0; j <= ticks; j++) {
+      const v = (yMax / ticks) * j, y = Y(v);
+      ax += `<line x1="${M.l}" x2="${CW - M.r}" y1="${y}" y2="${y}"${j === 0 ? ' class="base"' : ''}/><text x="${M.l - 6}" y="${y + 3.5}" text-anchor="end">${Math.round(v)}</text>`;
+    }
+    const weeks = T / 168, step = weeks <= 12 ? 2 : weeks <= 30 ? 4 : weeks <= 60 ? 8 : 13;
+    for (let w = 0; w <= weeks; w += step) ax += `<text x="${X(w * 168)}" y="${CH - 8}" text-anchor="middle">${w} нед</text>`;
+    if (r.W0 > 0) ax += `<line x1="${X(r.W0)}" x2="${X(r.W0)}" y1="${M.t}" y2="${M.t + ph}" stroke-dasharray="0" style="stroke:var(--axis)"/><text x="${X(r.W0) + 4}" y="${M.t + 10}" text-anchor="start">разогрев</text>`;
+    return `<svg viewBox="0 0 ${CW} ${CH}" role="img" aria-label="Задачи на этапах во времени, сценарий ${r.which}">
+      <g class="ax">${ax}</g>${paths}
+      <line class="cursor" data-x0="${M.l}" data-w="${pw}" x1="${M.l}" x2="${M.l}" y1="${M.t}" y2="${M.t + ph}" stroke="var(--ink)" stroke-width="1.5"/>
+      <line class="hover" x1="0" x2="0" y1="${M.t}" y2="${M.t + ph}" stroke="var(--ink-2)" stroke-width="1" visibility="hidden"/>
+    </svg>`;
+  }
+
+  function renderCharts() {
+    $('#view-wip').setAttribute('aria-pressed', view === 'wip');
+    $('#view-cfd').setAttribute('aria-pressed', view === 'cfd');
+    const names = bandNames(out.A), colors = bandColors(out.A.stages.length);
+    $('#legend').innerHTML = names.map((nm, i) => ({ nm, c: colors[i] })).reverse().map(x => `<span><i style="background:${x.c}"></i>${esc(x.nm)}</span>`).join('');
+    const tot = r => Math.max(...seriesOf(r).map(v => v.reduce((a, b) => a + b, 0)));
+    const yMax = niceMax(Math.max(tot(out.A), tot(out.B), 4));
+    $('#charts').innerHTML = ['A', 'B'].map(w => `
+      <div class="chart" data-chart="${w}">
+        <div class="chart-title"><span class="tag ${w.toLowerCase()}">${w === 'A' ? 'A · люди' : 'B · с агентами'}</span></div>
+        ${chartSvg(out[w], yMax)}
+        <div class="tip" hidden></div>
+      </div>`).join('');
+    document.querySelectorAll('[data-chart]').forEach(box => {
+      const r = out[box.dataset.chart], svg = box.querySelector('svg'), tip = box.querySelector('.tip'), hover = box.querySelector('.hover');
+      const frameAt = ev => {
+        const rect = svg.getBoundingClientRect();
+        const x = (ev.clientX - rect.left) / rect.width * CW;
+        const t = (x - M.l) / (CW - M.l - M.r) * r.T;
+        return Math.max(0, Math.min(r.frames.length - 1, Math.round(t / 4)));
+      };
+      svg.addEventListener('mousemove', ev => {
+        const i = frameAt(ev), f = r.frames[i];
+        const x = M.l + (f.t / r.T) * (CW - M.l - M.r);
+        hover.setAttribute('x1', x); hover.setAttribute('x2', x); hover.setAttribute('visibility', 'visible');
+        const rows = r.stages.map((s, j) => ({ name: s.name, v: f.w[j] + f.k[j], q: f.w[j], c: stageColor(j) }));
+        tip.innerHTML = `<div><b>${clockLabel(f.t)}</b></div>` + rows.map(x => `<div><span><i class="dot" style="display:inline-block;background:${x.c};margin-right:5px"></i>${esc(x.name)}</span><span class="num">${x.v}${x.q ? ` (ждут ${x.q})` : ''}</span></div>`).join('') + `<div><span>Готово</span><span class="num">${f.done}</span></div>`;
+        tip.hidden = false;
+        const br = box.getBoundingClientRect();
+        let left = ev.clientX - br.left + 14;
+        if (left + tip.offsetWidth > br.width) left = ev.clientX - br.left - tip.offsetWidth - 14;
+        tip.style.left = Math.max(0, left) + 'px';
+        tip.style.top = Math.max(0, ev.clientY - br.top - 20) + 'px';
+      });
+      svg.addEventListener('mouseleave', () => { tip.hidden = true; hover.setAttribute('visibility', 'hidden'); });
+      svg.addEventListener('click', ev => setFrame(frameAt(ev)));
+    });
+  }
+
+  // ---------- Загрузка ролей ----------
+  function renderUtil() {
+    const { A, B, thA, thB } = out;
+    const keys = [];
+    thA.pools.concat(thB.pools).forEach(p => { if (!keys.includes(p.key)) keys.push(p.key); });
+    const rows = keys.map(key => {
+      const a = A.pools.find(p => p.key === key), b = B.pools.find(p => p.key === key);
+      const ta = thA.pools.find(p => p.key === key), tb = thB.pools.find(p => p.key === key);
+      const label = (ta || tb).label, meta = (ta || tb).agent ? `${(ta || tb).count} агент.` : `${(ta || tb).count} чел.`;
+      return { key, label, meta, a: a && ta ? a.util : null, b: b && tb ? b.util : null, rhoA: ta && ta.rho, rhoB: tb && tb.rho };
+    });
+    const maxV = Math.max(1, ...rows.flatMap(r => [r.a, r.b].filter(Number.isFinite)));
+    const scale = Math.min(maxV, 1.5);
+    const bar = (v, cls, rho) => {
+      if (v == null) return `<div class="u-bar"><span class="u-val">—</span></div>`;
+      const w = Math.min(v, 1.5) / scale * 85;
+      const over = rho != null && rho >= 1 ? ' · перегруз' : '';
+      return `<div class="u-bar"><div class="u-fill ${cls}" style="width:${w}%"></div><span class="u-val">${pct(v)}${over}</span></div>`;
+    };
+    $('#util').innerHTML = rows.map(r => `
+      <div class="u-row">
+        <div class="u-name">${esc(r.label)}<small>${r.meta}${r.key === thA.bottleneck || r.key === thB.bottleneck ? ` · <span class="bn-chip">узкое место${r.key === thA.bottleneck && r.key === thB.bottleneck ? '' : r.key === thA.bottleneck ? ' A' : ' B'}</span>` : ''}</small></div>
+        <div class="u-bars"><div class="u-track"><span class="u-100" style="left:${1 / scale * 85}%"></span>${bar(r.a, 'a', r.rhoA)}${bar(r.b, 'b', r.rhoB)}</div></div>
+      </div>`).join('');
+  }
+
+  // ---------- Таблица этапов ----------
+  function renderStageTable() {
+    const { A, B } = out;
+    const c = (a, b, d, u) => `<td class="num">${fmt(a, d)}${u}</td><td class="num">${fmt(b, d)}${u}</td>`;
+    $('#stageTable').innerHTML = `<table>
+      <thead>
+        <tr><th rowspan="2">Этап</th><th colspan="2">Очередь, задач</th><th colspan="2">Ожидание</th><th colspan="2">Работа, ч</th><th colspan="2">Проходов на задачу</th></tr>
+        <tr><th>A</th><th>B</th><th>A</th><th>B</th><th>A</th><th>B</th><th>A</th><th>B</th></tr>
+      </thead>
+      <tbody>${A.stages.map((s, i) => {
+        const b = B.stages[i];
+        return `<tr><td><i class="dot" style="display:inline-block;background:${stageColor(i)};margin-right:6px"></i>${esc(s.name)}${b.agentOn ? ' <small class="hint">· B: агент</small>' : ''}</td>
+          ${c(s.avgQueue, b.avgQueue, 1, '')}${c(s.avgWait / 24, b.avgWait / 24, 1, ' дн')}${c(s.avgTouch, b.avgTouch, 1, '')}${c(s.visits, b.visits, 2, '')}</tr>`;
+      }).join('')}</tbody></table>
+      <p class="hint">Ожидание — календарные дни в очереди этапа за один проход. Работа — рабочие часы исполнителя за проход, для агента уже с учётом ускорения.</p>`;
+  }
+
+  // ---------- События ----------
+  scalarIds.forEach(id => $('#' + id).addEventListener('input', e => {
+    const v = parseFloat(e.target.value);
+    if (!Number.isFinite(v)) return;
+    setScalar(id, v);
+    changed();
+  }));
+  ['agents247', 'downstreamFirst'].forEach(id => $('#' + id).addEventListener('change', e => { cfg[id] = e.target.checked; changed(); }));
+  document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => {
+    cfg.arrival.mode = b.dataset.mode; renderControls(); changed(true);
+  }));
+  $('#stages').addEventListener('input', onStageInput);
+  $('#stages').addEventListener('change', e => { if (e.target.tagName === 'SELECT' || e.target.type === 'checkbox') onStageInput(e); });
+  $('#stages').addEventListener('click', onStageClick);
+  $('#pools').addEventListener('input', onPoolInput);
+  $('#pools').addEventListener('click', onPoolClick);
+  $('#addPool').addEventListener('click', () => { cfg.pools.push({ id: uid('r'), name: 'Новая роль', count: 1 }); renderPools(); renderStages(); changed(true); });
+  $('#addStage').addEventListener('click', () => {
+    const pool = cfg.pools[0].id;
+    cfg.stages.push({ id: uid('s'), name: 'Новый этап', pool, min: 1, mode: 2, max: 4, rework: null, agent: { on: false, speed: 5, count: 2, oversight: 0.5, oversightPool: pool } });
+    renderStages(); changed(true);
+  });
+  $('#reseed').addEventListener('click', () => { cfg.seed = 1 + Math.floor(Math.random() * 99999); $('#seed').value = cfg.seed; changed(true); });
+  $('#reset').addEventListener('click', () => { cfg = clone(window.DEVFLOW_EXAMPLE); renderControls(); changed(true); });
+  $('#applyJson').addEventListener('click', () => {
+    const msg = $('#jsonMsg');
+    try {
+      const c = JSON.parse($('#json').value);
+      if (!Array.isArray(c.stages) || !c.stages.length || !Array.isArray(c.pools) || !c.pools.length || !c.arrival) throw new Error('нужны непустые stages и pools и блок arrival');
+      cfg = c; renderControls(); changed(true);
+      msg.className = 'msg'; msg.textContent = 'Применено.';
+    } catch (e) { msg.className = 'msg err'; msg.textContent = 'Не удалось разобрать JSON: ' + e.message; }
+  });
+  $('#copyJson').addEventListener('click', () => {
+    const ta = $('#json'), msg = $('#jsonMsg');
+    navigator.clipboard.writeText(ta.value).then(() => { msg.className = 'msg'; msg.textContent = 'Скопировано.'; })
+      .catch(() => { ta.select(); msg.className = 'msg'; msg.textContent = 'Текст выделен, скопируйте его вручную.'; });
+  });
+  $('#play').addEventListener('click', () => togglePlay());
+  $('#scrub').addEventListener('input', e => { togglePlay(false); setFrame(+e.target.value); });
+  $('#view-wip').addEventListener('click', () => { view = 'wip'; renderCharts(); setFrame(frame); });
+  $('#view-cfd').addEventListener('click', () => { view = 'cfd'; renderCharts(); setFrame(frame); });
+
+  renderControls();
+  frame = Math.round((cfg.horizonWeeks * 168 / 4) * 0.5);
+  run();
+})();
+</script>
+</body>
+</html>
