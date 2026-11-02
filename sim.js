@@ -65,6 +65,11 @@
     c.stages.forEach(s => {
       const v = [+s.min || 0, +s.mode || 0, +s.max || 0].map(x => Math.max(0, x)).sort((x, y) => x - y);
       s.min = v[0]; s.mode = v[1]; s.max = v[2];
+      if (s.ci) {
+        s.ci.power = Math.max(1, +s.ci.power || 1);
+        s.ci.pricePerHour = Math.max(0, +s.ci.pricePerHour || 0);
+        s.ci.scalable = s.ci.scalable == null ? 70 : Math.min(100, Math.max(0, +s.ci.scalable || 0));
+      } else s.ci = null;
       if (s.agent) {
         s.agent.speed = Math.max(0.01, +s.agent.speed || 1);
         s.agent.count = Math.max(1, Math.round(+s.agent.count || 1));
@@ -74,12 +79,20 @@
     return c;
   }
 
+  // Облачный CI/CD: время идёт по часам и не зависит от агентов, очереди нет, мощность покупается.
+  // Мощность ускоряет только распараллеливаемую долю (закон Амдала), а платим за всю мощность всё время.
+  function ciWall(st, hours) {
+    const f = st.ci.scalable / 100;
+    return hours * ((1 - f) + f / st.ci.power);
+  }
+  function ciCost(st, wall) { return wall * st.ci.power * st.ci.pricePerHour; }
+
   // Сценарий A — только люди. Сценарий B — включены агенты, поток умножен на multB.
   function scenarioOf(cfg, which) {
     const withAgents = which === 'B';
     const mult = withAgents ? (+cfg.arrival.multB || 1) : 1;
     return {
-      stages: cfg.stages.map(s => Object.assign({}, s, { agentOn: !!(withAgents && s.agent && s.agent.on) })),
+      stages: cfg.stages.map(s => Object.assign({}, s, { agentOn: !!(withAgents && s.agent && s.agent.on && !s.ci) })),
       perWeek: Math.max(0, +cfg.arrival.perWeek || 0) * mult,
       backlog: Math.max(0, Math.round(+cfg.arrival.backlog || 0)),
       mode: cfg.arrival.mode === 'backlog' ? 'backlog' : 'flow',
@@ -123,8 +136,14 @@
     cfg.pools.forEach(p => {
       pools['p:' + p.id] = { key: 'p:' + p.id, label: p.name, agent: false, count: p.count, cap: p.count * weekWork, load: 0 };
     });
+    let ciRuns = 0, ciHours = 0, ciCostPerTask = 0;
     sc.stages.forEach((st, s) => {
       const mean = (st.min + st.mode + st.max) / 3;
+      if (st.ci) {
+        const wall = ciWall(st, mean);
+        ciRuns += v[s]; ciHours += v[s] * wall; ciCostPerTask += v[s] * ciCost(st, wall);
+        return;
+      }
       const effort = mean * (1 + Math.max(0, v[s] - 1) * rf);
       if (st.agentOn) {
         const key = 'a:' + st.id;
@@ -147,11 +166,12 @@
       if (p.maxTp < maxTp) { maxTp = p.maxTp; bottleneck = p.key; }
     });
     const bottleneckStages = sc.stages.map((st, i) => {
-      if (!bottleneck) return false;
+      if (!bottleneck || st.ci) return false;
       if (st.agentOn) return bottleneck === 'a:' + st.id || bottleneck === 'p:' + st.agent.oversightPool;
       return bottleneck === 'p:' + st.pool;
     });
-    return { visits: v, pools: list, maxTp, bottleneck, bottleneckStages, perWeek: sc.perWeek, mode: sc.mode };
+    const ci = { runsPerTask: ciRuns, hoursPerTask: ciHours, costPerTask: ciCostPerTask, costPerWeek: ciCostPerTask * sc.perWeek };
+    return { visits: v, pools: list, maxTp, bottleneck, bottleneckStages, perWeek: sc.perWeek, mode: sc.mode, ci };
   }
 
   function Heap() { this.a = []; }
@@ -204,7 +224,10 @@
     sc.stages.forEach(s => {
       if (s.agentOn) res['a:' + s.id] = { key: 'a:' + s.id, label: 'Агенты · ' + s.name, agent: true, count: s.agent.count, busy: 0, queue: [], work: 0 };
     });
-    const finishAt = (r, t, w) => (r.agent && cfg.agents247 ? t + w : sched.addWork(t, w));
+    // Облако эластичное: занять его нельзя, поэтому у CI/CD нет очереди и рабочего календаря.
+    const cloud = { key: 'ci', cloud: true, count: Infinity, busy: 0, queue: [], work: 0 };
+    const finishAt = (r, t, w) => (r.cloud || (r.agent && cfg.agents247) ? t + w : sched.addWork(t, w));
+    let ciRuns = 0, ciHours = 0, ciSpent = 0;
 
     const heap = new Heap();
     let seq = 0;
@@ -263,6 +286,13 @@
       task.visits[s]++;
       const st = sc.stages[s];
       let w = tri(task.rng, st.min, st.mode, st.max);
+      if (st.ci) {
+        // Пересборка стоит столько же, сколько первая сборка: reworkFactor здесь не действует.
+        w = ciWall(st, w);
+        if (t >= W0 && t < T) { ciRuns++; ciHours += w; ciSpent += ciCost(st, w); }
+        request(cloud, { task, s, phase: 'work', w }, t);
+        return;
+      }
       if (task.visits[s] > 1) w *= cfg.reworkFactor / 100;
       let r;
       if (st.agentOn) { w /= st.agent.speed; r = res['a:' + st.id]; } else r = res['p:' + st.pool];
@@ -374,6 +404,11 @@
       wipEnd: inSystem,
       flowEff: leadWorkDone > 0 ? Math.min(1, effortDone / leadWorkDone) : NaN,
       reworksPerTask: doneInWin ? reworks / doneInWin : 0,
+      ci: {
+        runs: ciRuns, hours: ciHours, cost: ciSpent,
+        costPerWeek: win > 0 ? ciSpent / (win / HOURS_PER_WEEK) : 0,
+        costPerTask: doneInWin ? ciSpent / doneInWin : 0,
+      },
       drainT,
     };
   }

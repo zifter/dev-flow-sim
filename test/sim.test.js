@@ -42,3 +42,35 @@ test('перегрузка видна в аналитике', () => {
   const r = sim.simulate(cfg, 'A');
   assert.ok(r.wipEnd > r.wipStart * 2);
 });
+
+test('CI/CD не ускоряется агентом, не стоит в очереди и не занимает людей', () => {
+  const cfg = JSON.parse(JSON.stringify(long));
+  cfg.stages.find(s => s.id === 'ci').agent.on = true;
+  const b = sim.simulate(cfg, 'B');
+  const st = b.stages.find(s => s.id === 'ci');
+  assert.strictEqual(st.agentOn, false);
+  assert.strictEqual(st.avgWait, 0);
+  assert.ok(Math.abs(st.avgTouch - 7 / 12) < 0.03, `сборка ${st.avgTouch}`); // среднее (0,25 + 0,5 + 1) / 3
+  assert.ok(!b.pools.some(p => p.key.endsWith(':ci')));
+  assert.ok(!sim.analyze(cfg, 'B').bottleneckStages[1]);
+});
+
+test('деньги на CI/CD: симуляция совпадает с аналитикой', () => {
+  for (const which of ['A', 'B']) {
+    const r = sim.simulate(long, which), a = sim.analyze(long, which);
+    const err = Math.abs(r.ci.costPerWeek - a.ci.costPerWeek) / a.ci.costPerWeek;
+    assert.ok(err < 0.06, `${which}: ${r.ci.costPerWeek} vs ${a.ci.costPerWeek}`);
+  }
+});
+
+test('мощность укорачивает сборку по Амдалу и дорожает', () => {
+  const at = power => {
+    const cfg = JSON.parse(JSON.stringify(EXAMPLE));
+    cfg.stages.find(s => s.id === 'ci').ci.power = power;
+    return sim.analyze(cfg, 'A').ci;
+  };
+  const x1 = at(1), x4 = at(4), inf = at(1e6);
+  assert.ok(Math.abs(x4.hoursPerTask / x1.hoursPerTask - (0.3 + 0.7 / 4)) < 1e-6);
+  assert.ok(inf.hoursPerTask / x1.hoursPerTask > 0.29); // потолок — непараллельная доля 30%
+  assert.ok(x4.costPerTask > x1.costPerTask);
+});

@@ -25,6 +25,12 @@
         agent: { on: true, speed: 10, count: 4, oversight: 1.5, oversightPool: 'dev' },
       },
       {
+        id: 'ci', name: 'CI/CD', pool: 'ops', min: 0.25, mode: 0.5, max: 1,
+        rework: { to: 'dev', p: 10, pAgent: 15 },
+        ci: { power: 1, pricePerHour: 2, scalable: 70 },
+        agent: { on: false, speed: 1, count: 1, oversight: 0, oversightPool: 'ops' },
+      },
+      {
         id: 'review', name: 'Код-ревью', pool: 'lead', min: 0.5, mode: 1.5, max: 4,
         rework: { to: 'dev', p: 30, pAgent: 40 },
         agent: { on: false, speed: 5, count: 2, oversight: 0.5, oversightPool: 'lead' },
