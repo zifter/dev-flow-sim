@@ -3,868 +3,1637 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Симулятор потока разработки</title>
-<meta name="claude:viewport-fit-sides" content="cover">
-<meta name="description" content="Модель workflow: люди против ИИ-агентов, пропускная способность и узкие места">
+<title>Процесс разработки</title>
+<meta name="description" content="Визуализация workflow: команда из людей и агентов, этапы и задачи разных типов">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Unbounded:wght@600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&family=Unbounded:wght@600&display=swap">
 <style>
-/* Layout: пульт слева (поток задач, роли, этапы), справа вывод сверху вниз: вердикт → доска → графики → таблицы */
+/* Первый экран — показ для зала: часы, главные цифры, схема. Ниже цифры спринта, команда и редактор. */
 :root {
-  --bg: #f4f4f0;
-  --surface: #fcfcfb;
-  --surface-2: #ecebe5;
-  --ink: #161614;
-  --ink-2: #52514e;
-  --muted: #7d7b75;
-  --grid: #e1e0d9;
-  --axis: #c3c2b7;
-  --line: rgba(11, 11, 11, 0.10);
-  --accent: #2a78d6;
-  --accent-ink: #1c5cab;
-  --a-col: #a3a198;
-  --b-col: #2a78d6;
-  --good-ink: #006300;
-  --crit: #d03b3b;
-  --crit-ink: #a32626;
-  --crit-bg: #fbeae8;
-  --warn: #fab219;
-  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --bg: #eef0f4; --surface: #ffffff; --surface-2: #e3e6ec;
+  --ink: #12151c; --ink-2: #434956; --muted: #6c7382;
+  --grid: #dde0e7; --axis: #9aa1b0; --line: rgba(10, 14, 24, 0.13);
+  --accent: #1f6fd8;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #c98500;
   --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
-  --done: #c9c7bf;
+  --k1: #0e8fa8; --k2: #c2417e; --k3: #6f8a00; --k4: #a25f00;
+  /* Словарь схемы: один цвет — один смысл */
+  --wait: #d9920a; --work: #1f6fd8; --agent: #7446e0; --neck: #d81e1e; --bug: #d3187f; --done: #0f9a5c;
+  --person: #39404e; --on-fill: #ffffff; --neck-tint: rgba(216, 30, 30, 0.08);
+  --hot: var(--neck); --warm: var(--ink-2); --ok: var(--muted); --cold: var(--axis);
   --f-display: "Unbounded", "Golos Text", system-ui, sans-serif;
   --f-body: "Golos Text", system-ui, -apple-system, "Segoe UI", sans-serif;
   --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0f0f0e; --surface: #1a1a19; --surface-2: #262624; --ink: #f0efec; --ink-2: #c3c2b7;
-    --muted: #8f8d86; --grid: #2c2c2a; --axis: #45453f; --line: rgba(255, 255, 255, 0.10);
-    --accent: #3987e5; --accent-ink: #86b6ef; --a-col: #6d6b65; --b-col: #3987e5; --good-ink: #0ca30c;
-    --crit-ink: #f08a8a; --crit-bg: #3a1c1b;
+    --bg: #11131a; --surface: #1a1d26; --surface-2: #262a35; --ink: #f4f5f8; --ink-2: #c6cad4;
+    --muted: #8e94a3; --grid: #2d313d; --axis: #5a6070; --line: rgba(255, 255, 255, 0.12);
+    --accent: #4ea1ff;
     --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
-    --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767; --done: #45453f;
+    --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    --k1: #2bb3cf; --k2: #e0679f; --k3: #98b52a; --k4: #d18a2a;
+    /* Словарь схемы: один цвет — один смысл */
+    --wait: #f7bb3e; --work: #4ea1ff; --agent: #b794ff; --neck: #ff4242; --bug: #ff62b4; --done: #38d486;
+    --person: #e8eaf0; --on-fill: #0c0f18; --neck-tint: rgba(255, 66, 66, 0.13);
+    --hot: var(--neck); --warm: var(--ink-2); --ok: var(--muted); --cold: var(--axis);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0f0f0e; --surface: #1a1a19; --surface-2: #262624; --ink: #f0efec; --ink-2: #c3c2b7;
-  --muted: #8f8d86; --grid: #2c2c2a; --axis: #45453f; --line: rgba(255, 255, 255, 0.10);
-  --accent: #3987e5; --accent-ink: #86b6ef; --a-col: #6d6b65; --b-col: #3987e5; --good-ink: #0ca30c;
-  --crit-ink: #f08a8a; --crit-bg: #3a1c1b;
+  --bg: #11131a; --surface: #1a1d26; --surface-2: #262a35; --ink: #f4f5f8; --ink-2: #c6cad4;
+  --muted: #8e94a3; --grid: #2d313d; --axis: #5a6070; --line: rgba(255, 255, 255, 0.12);
+  --accent: #4ea1ff;
   --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
-  --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767; --done: #45453f;
+  --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  --k1: #2bb3cf; --k2: #e0679f; --k3: #98b52a; --k4: #d18a2a;
+  /* Словарь схемы: один цвет — один смысл */
+  --wait: #f7bb3e; --work: #4ea1ff; --agent: #b794ff; --neck: #ff4242; --bug: #ff62b4; --done: #38d486;
+  --person: #e8eaf0; --on-fill: #0c0f18; --neck-tint: rgba(255, 66, 66, 0.13);
+  --hot: var(--neck); --warm: var(--ink-2); --ok: var(--muted); --cold: var(--axis);
   color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-.panel, main.out, aside.controls, .boards, .util, .u-bars { grid-template-columns: minmax(0, 1fr); }
 html, body { margin: 0; }
 body {
   background: var(--bg); color: var(--ink); font: 14px/1.5 var(--f-body);
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: 20px 48px;
+  padding-bottom: 48px;
 }
-h1, h2, h3 { text-wrap: balance; margin: 0; }
-button, input, select, textarea { font: inherit; color: inherit; }
+.screen { margin-inline: -16px; }
+h1, h2 { text-wrap: balance; margin: 0; }
+button, input, select { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .num, input[type=number] { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
 
-.page { max-width: 1440px; margin: 0 auto; display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
-header.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 24px; }
-header.top h1 { font: 600 clamp(20px, 2.4vw, 28px)/1.15 var(--f-display); letter-spacing: -0.01em; }
-header.top p { margin: 6px 0 0; color: var(--ink-2); max-width: 70ch; }
-.layout { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 1100px) {
-  .layout { grid-template-columns: 400px minmax(0, 1fr); align-items: start; }
-  aside.controls { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; }
-}
-
-.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 14px; min-width: 0; }
-.panel > h2, .section-h { font: 600 13px/1.2 var(--f-body); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); }
+.page { max-width: 1440px; margin: 0 auto; padding-top: 12px; display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 14px; min-width: 0; grid-template-columns: minmax(0, 1fr); align-content: start; }
+.panel h2 { font: 700 20px/1.2 var(--f-body); color: var(--ink); }
+/* Подсказки свёрнуты: они для настройки, а не для зала */
+details.tip { font-size: 13px; }
+details.tip summary { cursor: pointer; color: var(--ink-2); width: fit-content; }
+details.tip .hint { margin-top: 6px; max-width: 110ch; }
 .hint { color: var(--muted); font-size: 12.5px; margin: 0; }
-aside.controls { display: grid; gap: 14px; }
-
-.field { display: grid; gap: 3px; min-width: 0; }
-.field > span { font-size: 12px; color: var(--ink-2); }
-input[type=text], input[type=number], select, textarea {
-  background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px; width: 100%; min-width: 0;
-}
-input[type=number] { font-size: 13px; }
-.row { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); }
-.row3 { display: grid; gap: 6px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.check { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; }
-.check input { margin-top: 3px; }
-.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
-.seg button { border: 0; background: transparent; padding: 5px 10px; cursor: pointer; font-size: 13px; }
-.seg button[aria-pressed=true] { background: var(--ink); color: var(--bg); }
-
-.btn { border: 1px solid var(--line); background: var(--surface-2); border-radius: 6px; padding: 5px 10px; cursor: pointer; font-size: 13px; }
+.bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.btns { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.btn { border: 1px solid var(--line); background: var(--surface-2); border-radius: 6px; padding: 5px 10px; cursor: pointer; font-size: 13px; text-decoration: none; color: inherit; }
 .btn:hover { border-color: var(--axis); }
-.btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); min-width: 96px; }
 .btn.ghost { background: transparent; }
 .icon-btn { border: 0; background: transparent; cursor: pointer; padding: 2px 6px; border-radius: 4px; color: var(--ink-2); font-size: 14px; }
 .icon-btn:hover { background: var(--surface-2); color: var(--ink); }
-.btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.icon-btn:disabled { opacity: 0.3; cursor: default; background: transparent; }
+input[type=text], input[type=number], select { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px; width: 100%; min-width: 0; }
+.bar select { width: auto; }
+/* Шапка первого экрана: часы, главные цифры, тихие кнопки */
+.screen { height: 100vh; height: 100svh; min-height: 620px; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 10px; padding: 16px 28px 12px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.hud { display: flex; align-items: center; gap: 24px 44px; min-width: 0; }
+.time { display: flex; align-items: center; gap: 22px; flex: none; }
+.dial { flex: none; display: block; width: 168px; height: 168px; }
+.dial .face { fill: var(--surface); }
+.dial .track { fill: none; stroke: var(--grid); stroke-width: 5.5; }
+.dial .day { fill: none; stroke: var(--work); stroke-width: 5.5; }
+.dial .work-a { fill: none; stroke: var(--agent); stroke-width: 2.5; }
+.dial .day.off, .dial .work-a.off { opacity: 0.3; }
+.dial .tk { stroke: var(--axis); stroke-width: 1; }
+.dial text { font: 600 6px var(--f-body); fill: var(--ink); }
+.dial .hand { stroke: var(--ink); stroke-width: 2.6; stroke-linecap: round; }
+.dial .hub { fill: var(--ink); }
+.time-txt { display: grid; gap: 4px; width: 330px; max-width: 100%; }
+.clock-now { font: 600 56px/1 var(--f-display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.clock { font: 600 25px/1.2 var(--f-body); white-space: nowrap; }
+.clock-sub { font: 600 21px/1.2 var(--f-body); color: var(--work); white-space: nowrap; }
+.clock-sub.rest { color: var(--muted); }
+/* Календарь недели: сегодня выделено, прошедшие дни бледнее, выходные людей — контуром */
+.week { display: flex; align-items: center; gap: 4px; margin-top: 3px; }
+.week i { font: 600 15px/26px var(--f-body); font-style: normal; width: 38px; text-align: center; border-radius: 6px; background: var(--surface-2); color: var(--ink-2); }
+.week i.rest { background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1px var(--axis); }
+.week i.past { opacity: 0.45; }
+.week i.today { background: var(--ink); color: var(--bg); box-shadow: none; opacity: 1; }
+.kpis { display: flex; flex: 1; justify-content: space-evenly; gap: 28px; min-width: 0; }
+.kpi { display: grid; gap: 2px; min-width: 0; }
+.kpi span { font: 600 23px/1.2 var(--f-body); color: var(--ink-2); white-space: nowrap; }
+.kpi b { font: 600 62px/1.1 var(--f-display); letter-spacing: -0.03em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.kpi small { font: 500 21px/1.2 var(--f-body); color: var(--ink-2); white-space: nowrap; }
+.kpi.bugs b { color: var(--bug); }
+.hud-btns { display: grid; gap: 6px; flex: none; width: 124px; opacity: 0.62; transition: opacity 0.15s; }
+.hud-btns:hover, .hud-btns:focus-within { opacity: 1; }
+.hud-btns .btn, .hud-btns select { width: 100%; text-align: center; background: transparent; }
+.hud-btns .btn.primary { min-width: 0; background: transparent; color: var(--ink); border-color: var(--line); }
+@media (max-width: 1500px) {
+  .hud { gap: 16px 24px; } .time-txt { width: 280px; } .dial { width: 132px; height: 132px; }
+  .clock-now { font-size: 42px; } .clock { font-size: 21px; } .clock-sub { font-size: 18px; }
+  .week i { width: 32px; font-size: 13px; } .kpi b { font-size: 42px; } .kpi span, .kpi small { font-size: 17px; }
+}
+@media (max-width: 999px) {
+  .screen { height: auto; min-height: 0; padding: 14px 0; } .hud { flex-wrap: wrap; } .kpis { flex: 1 1 100%; flex-wrap: wrap; justify-content: flex-start; }
+  .hud-btns { display: flex; flex-wrap: wrap; width: auto; opacity: 1; } .hud-btns .btn, .hud-btns select { width: auto; }
+}
+/* Story Points за спринт */
+.vel { display: grid; gap: 16px 24px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 900px) { .vel { grid-template-columns: 280px minmax(0, 1fr); } }
+.vel-stats { display: grid; gap: 14px; align-content: start; }
+.stat { display: grid; gap: 2px; }
+.stat > span { font-size: 12px; color: var(--ink-2); }
+.stat b { font: 600 28px/1.1 var(--f-mono); }
+.stat b small { font: 500 13px var(--f-body); color: var(--muted); margin-left: 4px; }
+.stat > small { font-size: 12px; color: var(--muted); }
+.stat .was { color: var(--ink-2); }
+.stat .bugs { color: var(--bug); }
+.vel-chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.vel-chart .ax text { fill: var(--muted); font: 10px var(--f-mono); }
+.vel-chart .ax line { stroke: var(--grid); }
+.vel-chart .bar { fill: var(--done); }
+.vel-chart .bar.cur { fill: var(--done); fill-opacity: 0.3; stroke: var(--done); stroke-dasharray: 3 2; }
+.vel-chart .bar-v { font: 600 10px var(--f-mono); fill: var(--ink-2); }
+.vel-chart .est { fill: none; stroke: var(--ink); stroke-width: 2; }
+.vel-chart .est-d { fill: var(--ink); }
+.vel-chart .fc { stroke: var(--ink-2); stroke-width: 1.5; stroke-dasharray: 6 4; }
+.vel-chart .fc-t { fill: var(--ink-2); font: 600 10px var(--f-mono); }
+.vel-chart .was { stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 2 3; }
+.vel-chart .was-t { fill: var(--muted); font: 10px var(--f-mono); }
+.vel-chart .chg { stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 3 3; }
+.vel-legend .l-chg { height: 10px; width: 0; border-left: 2px dashed var(--muted); vertical-align: -1px; }
+.vel-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink-2); margin-top: 6px; }
+.vel-legend i { display: inline-block; width: 14px; height: 10px; margin-right: 5px; vertical-align: -1px; }
+.vel-legend .l-bar { background: var(--done); border-radius: 2px; }
+.vel-legend .l-est { height: 2px; background: var(--ink); vertical-align: 3px; }
+.vel-legend .l-fc { height: 0; border-top: 2px dashed var(--ink-2); vertical-align: 3px; }
+.vel-legend .l-was { height: 0; border-top: 2px dotted var(--muted); vertical-align: 3px; }
 
-.pool-row { display: grid; grid-template-columns: minmax(0, 1fr) 70px auto; gap: 6px; align-items: center; }
+/* Схема: подписи крупные, на проекторе читаются из зала. Единицы SVG близки к пикселям экрана 1920. */
+.flow-scroll { min-height: 0; overflow-x: auto; overflow-y: hidden; }
+.flow { height: 100%; }
+.flow svg { width: 100%; height: 100%; display: block; }
+.flow .n-box { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+.flow .queue .n-box { fill: transparent; stroke: none; }
+.flow .tray { fill: none; stroke: var(--wait); stroke-width: 4; stroke-linecap: round; }
+.flow .term .n-box { fill: transparent; stroke: var(--done); stroke-width: 4; }
+.flow .st { cursor: pointer; }
+.flow .st:hover .n-box, .flow .st:focus-visible .n-box { stroke: var(--ink-2); stroke-width: 2.5; }
+.flow .queue:hover .tray, .flow .queue:focus-visible .tray { stroke-width: 6; }
+.flow .node:focus-visible, .flow .ins:focus-visible { outline: none; }
+.flow .n-name { font-family: var(--f-body); font-weight: 700; fill: var(--ink); }
+.flow .term .n-name { fill: var(--done); }
+.flow .n-sub { font: 500 21px var(--f-body); fill: var(--ink-2); }
+.flow .neck-sub { fill: var(--neck); font-weight: 700; }
+.flow .n-cnt { font: 700 25px var(--f-body); fill: var(--wait); }
+.flow .n-big { font-family: var(--f-display); font-weight: 600; fill: var(--wait); }
+.flow .n-of { font-family: var(--f-body); font-weight: 600; font-size: 26px; fill: var(--ink-2); }
+.flow .term .n-big { fill: var(--done); }
+.flow .lane-t { font: 600 18px var(--f-body); fill: var(--ink-2); }
+.flow .floor { stroke: var(--axis); stroke-width: 2; }
+.flow .av { font-family: var(--f-body); font-weight: 700; fill: var(--on-fill); }
+.flow .hum { fill: var(--person); }
+.flow .ai { fill: var(--agent); }
+/* Карточка в работе сама полоса прогресса: бледная подложка и яркая заливка */
+.flow .c-bg { opacity: 0.3; }
+.flow .c-work { fill: var(--work); } .flow .c-agent { fill: var(--agent); } .flow .c-bug { fill: var(--bug); }
+.flow .c-wait { fill: var(--wait); } .flow .c-done { fill: var(--done); }
+.flow .c-t { font-family: var(--f-body); font-weight: 700; fill: var(--ink); }
+.flow .c-t.on { fill: var(--on-fill); }
+.flow .off { opacity: 0.5; }
+.flow .e-base { fill: none; stroke: var(--axis); stroke-width: 4; }
+.flow .e-head { fill: var(--axis); }
+.flow .e-hot { opacity: 0; pointer-events: none; }
+.flow .e-hot .e-line { fill: none; stroke: var(--ink); stroke-width: 6; stroke-linecap: round; }
+.flow .e-hot .e-tip { fill: var(--ink); }
+/* Вставка этапа и правка не шумят на сцене: «+» виден только под курсором или с клавиатуры */
+.flow .ins { cursor: pointer; opacity: 0; }
+.flow .ins circle { fill: var(--surface); stroke: var(--ink-2); stroke-width: 2; }
+.flow .ins path { stroke: var(--ink); stroke-width: 3; stroke-linecap: round; }
+.flow .ins:hover, .flow .ins:focus-visible { opacity: 1; }
+@media (hover: none) { .flow .ins { opacity: 0.6; } }
+.flow .fly { pointer-events: none; }
+/* Баги: пунктирная дуга от тестирования обратно в очередь */
+.flow .bug .e-base { stroke: var(--bug); stroke-dasharray: 12 8; }
+.flow .bug .e-head { fill: var(--bug); }
+.flow .bug .e-hot .e-line { stroke: var(--bug); }
+.flow .bug .e-hot .e-tip { fill: var(--bug); }
+.flow .bug-pill { fill: var(--bg); }
+.flow .bug-lbl { font: 700 24px var(--f-body); fill: var(--bug); }
+/* Узкое место: самое заметное на экране */
+.flow .is-neck .n-box { fill: var(--neck-tint); stroke: var(--neck); stroke-width: 7; }
+.flow .is-neck:hover .n-box, .flow .is-neck:focus-visible .n-box { stroke: var(--neck); stroke-width: 9; }
+.flow .neck-tab { fill: var(--neck); }
+.flow .neck-t { font-family: var(--f-body); font-weight: 800; fill: #fff; }
+.flow .fresh { animation: pop 0.6s ease-out; transform-box: fill-box; transform-origin: center; }
+@keyframes pop { from { opacity: 0; transform: scale(0.85); } }
+@media (max-width: 999px) { .flow-scroll { overflow-x: auto; } .flow, .flow svg { height: auto; } }
 
-.stage { border: 1px solid var(--line); border-radius: 8px; padding: 10px; display: grid; gap: 8px; background: var(--bg); }
-.stage-head { display: flex; gap: 6px; align-items: center; }
-.stage-head .sw { width: 10px; height: 10px; border-radius: 3px; flex: none; }
-.stage-head input { font-weight: 600; }
-.stage .agent { border-top: 1px dashed var(--axis); padding-top: 8px; display: grid; gap: 6px; }
-.stage .agent[data-on=false] .agent-body { display: none; }
-.sub { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+/* Загрузка: красным только узкое место, остальное нейтрально */
+.lv-hot { --lv: var(--hot); } .lv-warm { --lv: var(--warm); } .lv-ok { --lv: var(--ok); } .lv-cold { --lv: var(--cold); }
+.ld { display: inline-block; font: 600 11px/16px var(--f-mono); color: var(--bg); background: var(--lv); border-radius: 8px; padding: 0 6px; }
+.ld.na { background: var(--grid); color: var(--muted); }
+.loads { display: grid; gap: 6px; margin-top: 4px; }
+.loads .lh { font-size: 12px; color: var(--ink-2); }
+.load-row { display: grid; grid-template-columns: minmax(0, 1fr) 46px; gap: 2px 8px; align-items: center; font-size: 12.5px; }
+.load-row .bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--grid); overflow: hidden; }
+.load-row .bar span { display: block; height: 100%; background: var(--lv); border-radius: 3px; }
+.load-row .ld { justify-self: end; }
+.load-row small { color: var(--muted); }
+.idle { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; font-size: 13px; color: var(--ink-2); }
+/* Карточка участника фиксированного размера: меняющийся статус не двигает соседей */
+.person { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; grid-template-areas: "av pn ld" "av ps pd"; gap: 0 8px; align-items: center;
+  padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); min-width: 0; }
+.person > .av-h { grid-area: av; } .person > .pn { grid-area: pn; } .person > .ld { grid-area: ld; justify-self: end; }
+.person > .ps { grid-area: ps; } .person > .pd { grid-area: pd; justify-self: end; }
+.person > .pn, .person > .ps { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.person small { color: var(--muted); font-size: 12px; }
+.person .pd { font-variant-numeric: tabular-nums; }
+.person .ld { min-width: 40px; text-align: center; font-variant-numeric: tabular-nums; }
+.person.busy .pn { color: var(--ink); }
+.person.busy .ps { color: var(--ink-2); }
+.person.off .av-h { opacity: 0.4; }
+.av-h { display: inline-block; width: 22px; height: 22px; border-radius: 50%; color: var(--on-fill); font: 600 9px/22px var(--f-body); text-align: center; flex: none; }
+.av-h.agent { border-radius: 5px; }
 
-details.json summary { cursor: pointer; font-weight: 500; }
-details.json textarea { font: 12px/1.4 var(--f-mono); min-height: 220px; margin-top: 8px; }
-.msg { font-size: 12.5px; color: var(--ink-2); min-height: 1em; }
-.msg.err { color: var(--crit-ink); }
+/* Редактор */
+.edit { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 980px) { .edit { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); } }
+.edit .wide { grid-column: 1 / -1; }
+.rows { display: grid; gap: 6px; }
+.rows .head { font-size: 12px; color: var(--muted); }
+.sw { width: 10px; height: 10px; border-radius: 3px; }
+.settings { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.field { display: grid; gap: 3px; }
+.field > span { font-size: 12px; color: var(--ink-2); }
 
-main.out { display: grid; gap: 20px; min-width: 0; }
+.m-row { display: grid; gap: 6px; align-items: center;
+  grid-template-columns: 14px 22px 24px minmax(0, 1.2fr) minmax(0, 1fr) 104px minmax(0, 1fr) 76px 92px 30px;
+  grid-template-areas: "gr on av name role kind sk sp rt del"; }
+.m-row > .grip { grid-area: gr; }
+.m-row > .rt { grid-area: rt; display: flex; align-items: center; gap: 3px; color: var(--ink-2); font-size: 12px; white-space: nowrap; }
+.m-row > .rt input { min-width: 0; }
+.m-row > .on { grid-area: on; display: flex; justify-content: center; }
+.m-row > .on input { margin: 0; accent-color: var(--accent); width: 16px; height: 16px; }
+/* Отключённый участник: строка бледнеет, переключатель остаётся ярким */
+.m-row.inactive > :not(.on) { opacity: 0.45; }
+.m-row.inactive .nm { text-decoration: line-through; }
+.m-row > .sk { grid-area: sk; display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 13px; color: var(--ink-2); }
+.m-row > .sk label { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.m-row > .sk input { margin: 0; }
+.m-row > .sk .all { font-weight: 500; color: var(--ink); }
+.m-row > .sk input:disabled + .dom-dot, .m-row > .sk label:has(input:disabled) { opacity: 0.55; }
+.m-row > .sk small { color: var(--muted); font-size: 12px; }
+.dom-dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; }
+.m-row > .av-h { grid-area: av; } .m-row > .nm { grid-area: name; } .m-row > .rl { grid-area: role; }
+.m-row > .kd { grid-area: kind; } .m-row > .sp { grid-area: sp; display: flex; align-items: center; gap: 4px; color: var(--ink-2); } .m-row > .del { grid-area: del; }
+@media (max-width: 560px) {
+  .m-row { grid-template-columns: 14px 22px 24px minmax(0, 1fr) 96px 30px; grid-template-areas: "gr on av name name del" ". . . role kind kind" ". . . sk sk sk" ". . . sp rt rt"; padding-bottom: 6px; border-bottom: 1px solid var(--grid); }
+  .m-row.head { display: none; }
+}
 
-/* Вердикт */
-.verdict { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 760px) { .verdict { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); } }
-.hero-num { font: 600 52px/1 var(--f-body); letter-spacing: -0.02em; }
-.hero-num small { display: block; margin-top: 6px; font-size: 15px; font-weight: 500; color: var(--ink-2); letter-spacing: 0; }
-.hero-cap { color: var(--ink-2); margin-top: 6px; }
-.shift { display: grid; gap: 10px; align-content: start; }
-.shift p { margin: 0; }
-.bn-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--crit-bg); color: var(--crit-ink); white-space: nowrap; }
-.bn-chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--crit); }
-.alert { border-radius: 8px; padding: 10px 12px; background: var(--crit-bg); color: var(--crit-ink); font-size: 13px; }
-.alert strong { color: inherit; }
-.tag { display: inline-block; font: 600 11px/1 var(--f-body); letter-spacing: 0.04em; text-transform: uppercase; padding: 4px 7px; border-radius: 4px; }
-.tag.a { background: var(--surface-2); color: var(--ink-2); }
-.tag.b { background: var(--accent); color: #fff; }
+.r-row { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto 30px; gap: 8px; align-items: center; }
+#roles .r-row { grid-template-columns: 10px minmax(0, 1fr) 112px auto 30px; grid-template-areas: "sw nm rt who del" ". cr cr cr ."; row-gap: 4px; }
+#roles .r-row > .sw { grid-area: sw; } #roles .r-row > [data-k="name"] { grid-area: nm; } #roles .r-row > .r-rate { grid-area: rt; }
+#roles .r-row > small { grid-area: who; } #roles .r-row > .icon-btn { grid-area: del; } #roles .r-row > .cr { grid-area: cr; }
+/* Какие типы задач заводит роль: раскрывающийся список с галочками */
+.cr { font-size: 12.5px; color: var(--ink-2); }
+.cr summary { cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cr summary b { font-weight: 500; color: var(--ink); }
+.cr-list { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 6px 0 2px; }
+.cr-list label { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.cr-list label.all { font-weight: 500; color: var(--ink); }
+.cr-list input { margin: 0; }
+.cr-list i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; }
+.r-rate { display: flex; align-items: center; gap: 3px; font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+.sub-h { font: 600 12px/1.2 var(--f-body); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); margin-top: 6px; }
+.rows .r-row.head { font-size: 12px; color: var(--muted); }
+.r-row small { color: var(--muted); font-size: 12px; white-space: nowrap; }
+
+.s-row { display: grid; gap: 6px; align-items: center; border-radius: 8px;
+  grid-template-columns: 16px 10px minmax(0, 1.3fr) minmax(0, 1.1fr) 104px auto;
+  grid-template-areas: "gr sw name role num act"; }
+.s-row > .grip { grid-area: gr; } .s-row > .sw { grid-area: sw; } .s-row > .nm { grid-area: name; } .s-row > select { grid-area: role; }
+.s-row > .nu { grid-area: num; }
+.s-row > .bg { grid-area: num; display: flex; align-items: center; gap: 5px; font-size: 13px; color: var(--ink-2); white-space: nowrap; }
+.s-row > .bg input { margin: 0; accent-color: var(--bug); } .s-row > .act { grid-area: act; display: flex; }
+@media (max-width: 560px) {
+  .s-row { grid-template-columns: 16px 10px minmax(0, 1fr) 96px; grid-template-areas: "gr sw name act" ". . role num"; padding-bottom: 6px; border-bottom: 1px solid var(--grid); }
+  .s-row.head { display: none; }
+}
+.flash { animation: flash 1.4s ease-out; }
+/* Перетаскивание строк этапов и типов */
+.grip { cursor: grab; color: var(--muted); user-select: none; font-size: 15px; line-height: 1; text-align: center; padding: 2px 0; }
+.grip:hover { color: var(--ink); }
+.grip:active { cursor: grabbing; }
+.dragging { opacity: 0.4; }
+.s-row.drop-before { box-shadow: 0 -2px 0 var(--accent); }
+.s-row.drop-after { box-shadow: 0 2px 0 var(--accent); }
+tr.drop-before td { box-shadow: inset 0 2px 0 var(--accent); }
+tr.drop-after td { box-shadow: inset 0 -2px 0 var(--accent); }
+table.types td.act { white-space: nowrap; }
+@keyframes flash { from { box-shadow: 0 0 0 3px var(--accent); } to { box-shadow: 0 0 0 3px transparent; } }
 
 .table-wrap { overflow-x: auto; }
-table { border-collapse: collapse; width: 100%; font-size: 13px; }
-th, td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--grid); white-space: nowrap; }
-th:first-child, td:first-child { text-align: left; white-space: normal; }
-thead th { font-weight: 500; color: var(--ink-2); font-size: 12px; }
-td.num, th.num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
-.delta.good { color: var(--good-ink); }
-.delta.bad { color: var(--crit-ink); }
-.delta.flat { color: var(--muted); }
-
-/* Доска */
-.board-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; justify-content: space-between; }
-.player { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.player input[type=range] { width: min(320px, 60vw); accent-color: var(--accent); }
-.player select { width: auto; }
-input:disabled, select:disabled { opacity: 0.4; }
-.clock { font: 600 13px var(--f-mono); min-width: 15ch; }
-.boards { display: grid; gap: 14px; }
-.board-label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); }
-.board-scroll { overflow-x: auto; }
-.board { display: grid; gap: 6px; grid-template-columns: repeat(var(--cols), minmax(118px, 1fr)); }
-.col { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px; display: grid; gap: 6px; align-content: start; min-height: 132px; }
-.col.bn { border-color: var(--crit); }
-.col-h { display: grid; gap: 1px; }
-.col-h b { font-size: 13px; line-height: 1.25; }
-.col-h span { font-size: 11.5px; color: var(--muted); }
-.lane { display: grid; gap: 3px; }
-.lane-l { font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; }
-.lane-l .num { color: var(--ink-2); }
-.dots { display: flex; flex-wrap: wrap; gap: 3px; min-height: 9px; }
-.dot { width: 9px; height: 9px; border-radius: 2px; }
-.dot.w { border: 1.5px solid var(--ink-2); opacity: 0.7; }
-.more { font: 600 10.5px/9px var(--f-mono); color: var(--ink-2); }
-.done-n { font: 600 26px/1 var(--f-body); }
-
-/* Графики */
-.charts { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 900px) { .charts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.chart { position: relative; min-width: 0; }
-.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
-.chart-title { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 4px; }
-.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink-2); }
-.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
-.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); border-radius: 6px; padding: 7px 9px; font-size: 12px; min-width: 150px; z-index: 5; }
-.tip div { display: flex; justify-content: space-between; gap: 12px; }
-.tip .num { color: var(--ink); }
-.ax text { fill: var(--muted); font: 11px var(--f-mono); }
-.ax line { stroke: var(--grid); }
-.ax .base { stroke: var(--axis); }
-
-.util { display: grid; gap: 10px; }
-.u-row { display: grid; grid-template-columns: minmax(110px, 180px) minmax(0, 1fr); gap: 4px 12px; align-items: center; }
-.u-name { font-size: 13px; line-height: 1.25; }
-.u-name small { display: block; color: var(--muted); font-size: 11.5px; }
-.u-bars { display: grid; gap: 3px; position: relative; }
-.u-bar { display: flex; align-items: center; gap: 6px; height: 14px; }
-.u-fill { height: 12px; border-radius: 0 4px 4px 0; min-width: 2px; }
-.u-fill.a { background: var(--a-col); }
-.u-fill.b { background: var(--b-col); }
-.u-val { font: 11.5px var(--f-mono); color: var(--ink-2); white-space: nowrap; }
-.u-track { position: relative; }
-.u-100 { position: absolute; top: -2px; bottom: -2px; width: 0; border-left: 1px solid var(--axis); }
-@media (max-width: 520px) { .u-row { grid-template-columns: minmax(0, 1fr); } }
-
+table.types { border-collapse: collapse; font-size: 13px; }
+table.types th, table.types td { padding: 4px 4px; text-align: left; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+table.types th { font-weight: 500; font-size: 12px; color: var(--muted); vertical-align: bottom; }
+table.types th .sw { display: inline-block; margin-right: 5px; }
+table.types input[type=text] { width: 140px; }
+table.types input[type=number] { width: 68px; }
+table.types select { width: auto; }
+table.types .tp-color { width: 30px; height: 24px; padding: 0; border: 1px solid var(--line); border-radius: 5px; background: none; cursor: pointer; }
+table.types td.pct { font: 12px var(--f-mono); color: var(--muted); padding-right: 12px; }
+table.types .ag-ok { display: inline-flex; align-items: center; gap: 5px; color: var(--ink-2); padding-right: 8px; }
+table.types .ag-ok input { accent-color: var(--agent); margin: 0; }
+@media (prefers-reduced-motion: reduce) { .flow .fresh, .flash { animation: none; } }
+/* Пресеты */
+.preset-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.preset-bar select { width: auto; min-width: 220px; max-width: 100%; }
+.preset-bar input[type=text] { width: 220px; }
+.preset-bar .gap { width: 12px; }
+.btn.warn { border-color: var(--s8); color: var(--s8); }
+.msg { font-size: 12.5px; color: var(--ink-2); min-height: 1.2em; }
+.msg.err { color: var(--s8); }
+#presetState { color: var(--muted); }
+details.json summary { cursor: pointer; font-size: 13px; color: var(--ink-2); }
+details.json textarea { display: block; width: 100%; min-height: 280px; margin: 8px 0; padding: 8px; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; font: 12px/1.45 var(--f-mono); resize: vertical; }
 footer { color: var(--muted); font-size: 12.5px; }
-footer a { color: var(--accent-ink); }
-@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+footer a { color: var(--accent); }
 </style>
 </head>
 <body>
-<div class="page">
-  <header class="top">
-    <div>
-      <h1>Симулятор потока разработки</h1>
-      <p>Опишите workflow как в Jira: этапы, роли и сколько часов занимает задача на каждом этапе. Сценарий A считает команду из людей, сценарий B — ту же команду, где часть этапов делают ИИ-агенты. Сравнение показывает пропускную способность и где копится очередь.</p>
+<main class="screen">
+  <h1 class="sr">Процесс разработки</h1>
+  <div class="hud">
+    <div class="time">
+      <svg class="dial" id="dial" viewBox="-34 -34 68 68" role="img" aria-label="Часы модели: оборот стрелки — 12 часов"></svg>
+      <div class="time-txt">
+        <div class="clock-now" id="clockNow"></div>
+        <div class="clock" id="clock"></div>
+        <div class="clock-sub" id="clock-sub"></div>
+        <div class="week" id="week" aria-label="Календарь недели"></div>
+      </div>
     </div>
-    <div class="btns">
-      <button class="btn" id="reseed" type="button" title="Тот же конфиг, другие случайные числа">Другой прогон</button>
-      <button class="btn ghost" id="reset" type="button">Вернуть пример</button>
+    <div class="kpis" id="kpis"></div>
+    <div class="hud-btns">
+      <button class="btn primary" type="button" id="play">❚❚ Пауза</button>
+      <button class="btn" type="button" id="restart">Заново</button>
+      <select id="speed" aria-label="Скорость">
+        <option value="1">1 ч/с</option>
+        <option value="2">2 ч/с</option>
+        <option value="4" selected>4 ч/с</option>
+        <option value="8">8 ч/с</option>
+        <option value="24">сутки/с</option>
+        <option value="168">неделя/с</option>
+      </select>
+      <a class="btn" href="#settings">Настройки</a>
     </div>
-  </header>
-
-  <div class="layout">
-    <aside class="controls">
-      <section class="panel">
-        <h2>Поток задач</h2>
-        <div class="seg" role="group" aria-label="Режим генератора">
-          <button type="button" data-mode="flow" id="mode-flow">Постоянный поток</button>
-          <button type="button" data-mode="backlog" id="mode-backlog">Бэклог разом</button>
-        </div>
-        <div class="row">
-          <label class="field" data-show="flow"><span>Задач в неделю</span><input type="number" id="perWeek" min="0" step="0.5"></label>
-          <label class="field" data-show="backlog"><span>Задач в бэклоге</span><input type="number" id="backlog" min="0" step="1"></label>
-          <label class="field" data-show="flow"><span>Поток в B, ×</span><input type="number" id="multB" min="0" step="0.1"></label>
-        </div>
-        <div class="row">
-          <label class="field"><span>Горизонт, недель</span><input type="number" id="horizonWeeks" min="1" max="104" step="1"></label>
-          <label class="field" data-show="flow"><span>Разогрев, недель</span><input type="number" id="warmupWeeks" min="0" step="1"></label>
-          <label class="field"><span>Зерно</span><input type="number" id="seed" min="1" step="1"></label>
-        </div>
-        <div class="row">
-          <label class="field"><span>Часов в день</span><input type="number" id="hoursPerDay" min="1" max="24" step="0.5"></label>
-          <label class="field"><span>Дней в неделю</span><input type="number" id="daysPerWeek" min="1" max="7" step="1"></label>
-          <label class="field"><span>Доработка, % от оценки</span><input type="number" id="reworkFactor" min="0" step="5"></label>
-        </div>
-        <label class="check"><input type="checkbox" id="agents247"><span>Агенты работают 24/7, люди по рабочему календарю</span></label>
-        <label class="check"><input type="checkbox" id="downstreamFirst"><span>Сначала доводить начатое: роль берёт задачу с более позднего этапа</span></label>
-        <p class="hint">«Разогрев» не входит в метрики, пока система набирает задачи. «Доработка» — сколько стоит повторный проход этапа после возврата.</p>
-      </section>
-
-      <section class="panel">
-        <h2>Роли</h2>
-        <div id="pools" class="util"></div>
-        <div class="btns"><button class="btn" type="button" id="addPool">Добавить роль</button></div>
-      </section>
-
-      <section class="panel">
-        <h2>Этапы workflow</h2>
-        <p class="hint">Время — рабочие часы одного человека на задачу: минимум, типичное, максимум. Возврат отправляет задачу на более ранний этап. Агент включается только в сценарии B.</p>
-        <div id="stages" class="util"></div>
-        <div class="btns"><button class="btn" type="button" id="addStage">Добавить этап</button></div>
-      </section>
-
-      <section class="panel">
-        <details class="json">
-          <summary>Конфиг в JSON</summary>
-          <p class="hint">Скопируйте, чтобы сохранить свой workflow, или вставьте чужой и примените.</p>
-          <textarea id="json" spellcheck="false" aria-label="Конфиг в JSON"></textarea>
-          <div class="btns" style="margin-top:8px">
-            <button class="btn primary" type="button" id="applyJson">Применить</button>
-            <button class="btn" type="button" id="copyJson">Скопировать</button>
-          </div>
-          <div class="msg" id="jsonMsg"></div>
-        </details>
-      </section>
-    </aside>
-
-    <main class="out">
-      <section class="panel" id="verdict"></section>
-
-      <section class="panel">
-        <div class="board-head">
-          <h2 class="section-h">Доска</h2>
-          <div class="player">
-            <button class="btn primary" type="button" id="play">▶ Пуск</button>
-            <input type="range" id="scrub" min="0" max="0" value="0" aria-label="Время симуляции">
-            <select id="speed" aria-label="Скорость">
-              <option value="6">1 день/с</option>
-              <option value="18" selected>3 дня/с</option>
-              <option value="42">1 неделя/с</option>
-            </select>
-            <span class="clock" id="clock"></span>
-          </div>
-        </div>
-        <div class="boards" id="boards"></div>
-        <p class="hint">Контур — задача ждёт свободного исполнителя, заливка — в работе. Красная рамка — этап, упирающийся в самую загруженную роль.</p>
-      </section>
-
-      <section class="panel">
-        <div class="board-head">
-          <h2 class="section-h">Задачи на этапах во времени</h2>
-          <div class="seg" role="group" aria-label="Вид графика">
-            <button type="button" id="view-wip">В работе</button>
-            <button type="button" id="view-cfd">Накопительный (CFD)</button>
-          </div>
-        </div>
-        <div class="legend" id="legend"></div>
-        <div class="charts" id="charts"></div>
-        <p class="hint">Полоса этапа, которая расширяется со временем, — очередь перед узким местом. Клик по графику перематывает доску.</p>
-      </section>
-
-      <section class="panel">
-        <h2 class="section-h">Загрузка ролей</h2>
-        <div class="legend"><span><i style="background:var(--a-col)"></i>A — люди</span><span><i style="background:var(--b-col)"></i>B — с агентами</span></div>
-        <div class="util" id="util"></div>
-        <p class="hint">Доля доступного рабочего времени, занятая задачами. Выше 85% очередь растёт заметно, к 100% — без предела.</p>
-      </section>
-
-      <section class="panel">
-        <h2 class="section-h">Этапы</h2>
-        <div class="table-wrap" id="stageTable"></div>
-      </section>
-
-      <footer>Модель: дискретно-событийная симуляция, пуассоновский поток задач, треугольное распределение времени, FIFO-очереди с приоритетом поздних этапов. Предел пропускной способности считается аналитически по средней нагрузке на роль.</footer>
-    </main>
   </div>
+  <div class="flow-scroll"><div class="flow" id="flow"></div></div>
+</main>
+
+<div class="page">
+  <section class="panel">
+    <h2>Story Points за спринт</h2>
+    <div class="vel">
+      <div class="vel-stats"><div class="vel-stats" id="velStats"></div><div class="loads" id="velLoads"></div></div>
+      <div class="vel-chart">
+        <div id="velChart"></div>
+        <div class="vel-legend" id="velLegend"></div>
+      </div>
+    </div>
+    <details class="tip"><summary>Как считаются цифры</summary><p class="hint">Спринт — 2 недели с понедельника, SP засчитываются, когда задача дошла до «Готово». Расчёт — по формуле: часы команды за спринт делятся на средние часы на задачу у самой загруженной роли и умножаются на средний SP задачи. Он меняется сразу, как меняете команду, типы или этапы; пунктир «было» — расчёт до последнего изменения. Оценка по спринтам — среднее за последние 3 прошедших спринта (первый, в котором процесс только набирает задачи, не считается), она догоняет ускорение после изменений. Правки в редакторе не сбрасывают историю: процесс продолжается с новыми настройками, момент правки отмечен на графике пунктиром. С нуля — кнопка «Заново» или смена пресета.</p></details>
+  </section>
+
+  <section class="panel">
+    <h2>Команда</h2>
+    <div class="idle" id="idle"></div>
+  </section>
+
+  <div class="edit" id="settings">
+    <details class="tip wide"><summary>Как читать схему</summary><p class="hint">Жёлтая стопка — задачи ждут, чем толще полоска, тем больше задача. Синяя карточка — человек работает над задачей, фиолетовая — агент, заливка карточки показывает, сколько сделано. Круглый значок — человек, квадратный с «ИИ» — агент; бледный — нерабочее время, задача ждёт утра. Розовое — баги, зелёное — готово, красная рамка — узкое место: этап самой загруженной роли, где на задачу уходит больше всего часов. Цветная полоска на левом краю карточки в работе — цвет типа задачи из таблицы типов. На часах синяя дуга — рабочий день людей, фиолетовая — часы агентов, если они работают не круглосуточно. Клик по этапу открывает его в редакторе, «+» появляется на стрелке под курсором и вставляет новый этап.</p></details>
+    <section class="panel wide">
+      <h2>Пресеты</h2>
+      <div class="preset-bar">
+        <select id="presetSel" aria-label="Выбранный пресет"></select>
+        <span class="gap"></span>
+        <input type="text" id="presetName" aria-label="Название пресета" placeholder="Название пресета">
+        <button class="btn" type="button" id="presetRename">Переименовать</button>
+        <button class="btn" type="button" id="presetCopy">Сохранить копию</button>
+        <button class="btn" type="button" id="presetDel">Удалить</button>
+        <button class="btn ghost" id="reset" type="button">Вернуть пример</button>
+        <span class="gap"></span>
+        <button class="btn" type="button" id="jsonDownload">Скачать JSON</button>
+        <label class="btn" for="jsonFile">Открыть JSON…</label>
+        <input type="file" id="jsonFile" accept=".json,application/json" hidden>
+      </div>
+      <div class="msg" id="presetState"></div>
+      <div class="msg" id="presetMsg" role="status"></div>
+      <details class="json">
+        <summary>JSON текущих настроек</summary>
+        <textarea id="jsonText" spellcheck="false" aria-label="JSON текущих настроек"></textarea>
+        <div class="btns"><button class="btn primary" type="button" id="jsonApply">Применить</button><button class="btn" type="button" id="jsonCopy">Скопировать</button></div>
+      </details>
+      <details class="tip"><summary>Подсказка</summary><p class="hint">Пресет — все настройки ниже: команда, рабочее время, роли, этапы и типы задач. Все правки ниже сразу сохраняются в выбранный пресет, а выбранный пресет запоминается между перезагрузками страницы. Выбор в списке переключает пресет и перезапускает процесс. Встроенный пример не меняется: первая правка создаёт из него новый пресет. «Сохранить копию» — новый пресет из текущих настроек под названием из поля. «Скачать JSON» сохраняет настройки файлом, «Открыть JSON…» загружает такой файл. JSON можно поправить руками и нажать «Применить».</p></details>
+    </section>
+    <section class="panel">
+      <h2>Команда</h2>
+      <div class="settings">
+        <label class="field"><span>Люди работают, ч в сутки</span><input type="number" id="humanHours" min="1" max="24" step="1"></label>
+        <label class="field"><span>Агенты работают, ч в сутки</span><input type="number" id="agentHours" min="1" max="24" step="1"></label>
+        <label class="field"><span>Люди работают, дней в неделю</span><input type="number" id="humanDays" min="1" max="7" step="1"></label>
+        <label class="field"><span>Агенты работают, дней в неделю</span><input type="number" id="agentDays" min="1" max="7" step="1"></label>
+        <label class="field"><span>Валюта ставок</span><input type="text" id="currency" maxlength="4" placeholder="$"></label>
+        <label class="field"><span>Ставка агента по умолчанию, за час</span><input type="number" id="agentRate" min="0" step="0.5"></label>
+      </div>
+      <div class="rows" id="team"></div>
+      <div class="btns">
+        <button class="btn" type="button" id="addHuman">Добавить человека</button>
+        <button class="btn" type="button" id="addAgent">Добавить агента</button>
+      </div>
+      <details class="tip"><summary>Подсказка</summary><p class="hint">Рабочий день начинается в 9:00, неделя — с понедельника: при 5 днях суббота и воскресенье выходные. Галочка «Вкл» отключает участника: он остаётся в настройках, но не работает и не входит в расчёт. Участник берёт этапы своей роли и только задачи своих доменов: «все» — любые домены, в том числе добавленные потом. Агент работает в указанное число раз быстрее человека. Ставка — цена часа: людям платим за всё рабочее время, даже когда они ждут задач, агентам — только за часы работы. Пустое поле — ставка роли (у агента — ставка агента по умолчанию); у роли пустое поле — ориентир по её названию.</p></details>
+    </section>
+    <section class="panel">
+      <h2>Роли</h2>
+      <div class="rows" id="roles"></div>
+      <div class="btns"><button class="btn" type="button" id="addRole">Добавить роль</button></div>
+      <h3 class="sub-h">Домены</h3>
+      <div class="rows" id="domains"></div>
+      <div class="btns"><button class="btn" type="button" id="addDomain">Добавить домен</button></div>
+      <details class="tip"><summary>Подсказка</summary><p class="hint">Домен — область работы, например Client или Backend. У участника отмечаются его домены, у типа задачи — её домен: такую задачу и её ревью берут только участники с этим доменом. «Заводит задачи» у роли — какие типы она создаёт: исполнитель первого этапа (обычно PM) ставит новые задачи только этих типов, по их долям; исполнитель этапа «находит баги» (обычно QA) находит баги только этих типов.</p></details>
+    </section>
+    <section class="panel wide">
+      <h2>Этапы</h2>
+      <div class="rows" id="stages"></div>
+      <div class="btns"><button class="btn" type="button" id="addStage">Добавить этап</button></div>
+      <details class="tip"><summary>Подсказка</summary><p class="hint">Первый этап — источник: его исполнитель создаёт задачи, пока очередь за ним не заполнится. Этап без роли — очередь, задачи в ней ждут исполнителя следующего этапа; её WIP-лимит — в поле «Лимит», 0 — без лимита (клик по очереди на схеме ставит курсор сюда). Следующий этап задачи берёт другой участник той же роли, если он есть: свой код никто не ревьюит. Порядок этапов меняется перетаскиванием за ⠿ или кнопками ↑ ↓. «Находит баги» — на этом этапе исполнитель находит баги у задач (сколько и каких — в типах задач), баги уходят в бэклог.</p></details>
+    </section>
+    <section class="panel wide">
+      <h2>Типы задач</h2>
+      <div class="table-wrap" id="types"></div>
+      <div class="btns"><button class="btn" type="button" id="addType">Добавить тип</button></div>
+      <details class="tip"><summary>Подсказка</summary><p class="hint">SP — оценка задачи в Story Points, из неё складывается скорость за спринт. Часы человека на этап для каждого типа; агент делит их на своё ускорение. Домен — задачу и её ревью берут только участники, у которых этот домен отмечен в команде; «любой» — все. «ИИ-агенты: можно» снят — задачи этого типа делают только люди, агент их не берёт ни на одном этапе. 0 — задача этого типа пропускает этап. Доля — как часто PM ставит задачи этого типа: при долях 3 и 1 из четырёх задач три будут первого типа. Порядок строк меняется перетаскиванием за ⠿ или кнопками ↑ ↓. «Баги, %» — у какой доли задач этого типа на этапе с галочкой «находит баги» найдут баг. Bug — обязательный тип: все найденные баги этого типа, домен баг берёт у задачи, в которой его нашли («как у задачи»); доля у Bug — сколько багов ставит сам PM, 0 — только от QA.</p></details>
+    </section>
+  </div>
+
+  <footer>Время условное: часы работы на задачу без случайности. Первая версия со статистикой и сравнением с ИИ-агентами — <a href="ver1/index.html">ver1</a>.</footer>
 </div>
 
-<script src="sim.js"></script>
-<script src="example.js"></script>
+<script src="flow.js"></script>
 <script>
 (function () {
   'use strict';
-  const STORE = 'devflow-sim-cfg-v1';
-  const S = window.DevFlowSim;
+  const STORE = 'devflow-flow-v2';
+  const F = window.DevFlow;
   const clone = o => JSON.parse(JSON.stringify(o));
   const $ = (s, el) => (el || document).querySelector(s);
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const fmt = (x, d = 1) => (Number.isFinite(x) ? x.toLocaleString('ru-RU', { minimumFractionDigits: d, maximumFractionDigits: d }) : '—');
-  const pct = x => (Number.isFinite(x) ? Math.round(x * 100) + '%' : '∞');
-  const stageColor = i => `var(--s${(i % 8) + 1})`;
   const uid = p => p + Math.random().toString(36).slice(2, 7);
+  const clip = (s, max) => (s.length > max ? s.slice(0, Math.max(1, max - 1)) + '…' : s);
+  const fmtH = h => (+h).toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+  const pad = n => String(n).padStart(2, '0');
+  const reduceMotion = () => !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  // Геометрия схемы: ширина узла, отступы, строка исполнителя, размер карточки задачи.
+  // Единицы близки к пикселям экрана 1920: ширина схемы, колонка «Готово», зазор, минимальная ширина этапа, поля, внутренний отступ.
+  const G = { W: 1860, DONE: 196, GAP: 62, MIN: 190, PAD: 4, X: 20, HEAD: 118, ROW: 58 };
+  // Толщина полоски в стопке — размер задачи; зазор между полосками.
+  const SLAB = { S: 10, M: 16, L: 25 }, SLAB_GAP = 3;
+  const FLIGHT_MS = 650;
+  const DAY_START = 9; // ноль модели — 9:00 первого дня
 
-  let cfg = load();
-  let out = null;
-  let frame = 0, playing = false, lastTs = 0, view = 'wip';
+  let cfg = load(), st = null, geo = null, fresh = null;
+  let playing = true, lastTs = 0, dirty = true, crewEls = [], dialKey = '', fc = null, fcWas = null, velSig = '';
+  const flights = [], flightEnd = new Map();
 
   function load() {
     try {
       const raw = localStorage.getItem(STORE);
-      if (raw) { const c = JSON.parse(raw); if (c && c.stages && c.pools) return c; }
+      if (raw) {
+        const c = JSON.parse(raw);
+        // Старый сохранённый конфиг приводим к новой схеме: команда и типы задач.
+        if (c && c.version === 2 && c.stages && c.stages.length && c.roles && c.roles.length) return F.normalize(c);
+      }
     } catch (e) { /* хранилище недоступно */ }
-    return clone(window.DEVFLOW_EXAMPLE);
+    return clone(F.EXAMPLE);
   }
-  function save() { try { localStorage.setItem(STORE, JSON.stringify(cfg)); } catch (e) { /* без сохранения */ } }
-
-  // ---------- Пульт ----------
-  const scalarIds = ['perWeek', 'backlog', 'multB', 'horizonWeeks', 'warmupWeeks', 'seed', 'hoursPerDay', 'daysPerWeek', 'reworkFactor'];
-  function getScalar(id) { return ['perWeek', 'backlog', 'multB'].includes(id) ? cfg.arrival[id] : cfg[id]; }
-  function setScalar(id, v) { if (['perWeek', 'backlog', 'multB'].includes(id)) cfg.arrival[id] = v; else cfg[id] = v; }
-
-  function renderControls() {
-    scalarIds.forEach(id => { $('#' + id).value = getScalar(id); });
-    $('#agents247').checked = !!cfg.agents247;
-    $('#downstreamFirst').checked = !!cfg.downstreamFirst;
-    const mode = cfg.arrival.mode === 'backlog' ? 'backlog' : 'flow';
-    $('#mode-flow').setAttribute('aria-pressed', mode === 'flow');
-    $('#mode-backlog').setAttribute('aria-pressed', mode === 'backlog');
-    document.querySelectorAll('[data-show]').forEach(el => { el.hidden = el.dataset.show !== mode; });
-    renderPools();
-    renderStages();
-    $('#json').value = JSON.stringify(cfg, null, 2);
+  function save() {
+    persistPreset();
+    try { localStorage.setItem(STORE, JSON.stringify(cfg)); } catch (e) { /* без сохранения */ }
+    renderJson();
   }
 
-  function poolOptions(sel) {
-    return cfg.pools.map(p => `<option value="${esc(p.id)}"${p.id === sel ? ' selected' : ''}>${esc(p.name)}</option>`).join('');
+  // ---------- Пресеты ----------
+  // Пресеты хранятся в браузере как { название: настройки }, выбранный — отдельно, чтобы пережить перезагрузку.
+  // Текущие настройки всегда принадлежат выбранному пресету: любая правка сразу пишется в него.
+  // Встроенный пример не меняется — первая правка создаёт из него новый пресет.
+  const PRESETS = 'devflow-presets-v2', ACTIVE = 'devflow-active-v2', EXAMPLE_KEY = '__example';
+  let active = EXAMPLE_KEY;
+  function loadPresets() {
+    try { const p = JSON.parse(localStorage.getItem(PRESETS) || '{}'); return p && typeof p === 'object' ? p : {}; } catch (e) { return {}; }
+  }
+  function storePresets(p) { try { localStorage.setItem(PRESETS, JSON.stringify(p)); return true; } catch (e) { return false; } }
+  function storeActive() { try { localStorage.setItem(ACTIVE, active); } catch (e) { /* без сохранения */ } }
+  function presetMsg(text, err) { const m = $('#presetMsg'); m.textContent = text || ''; m.className = 'msg' + (err ? ' err' : ''); }
+  const withoutName = c => { const n = F.normalize(c); delete n.name; return JSON.stringify(n); };
+  const sameAsExample = c => withoutName(c) === withoutName(F.EXAMPLE);
+  function uniqueName(base, p) { let n = base, k = 2; while (n in p) n = `${base} ${k++}`; return n; }
+  function persistPreset() {
+    const p = loadPresets();
+    if (active === EXAMPLE_KEY) {
+      if (sameAsExample(cfg)) return;
+      active = uniqueName('Мой пресет', p);
+      presetMsg(`Встроенный пример не меняется, поэтому создан пресет «${active}». Дальше правки сохраняются в него.`);
+      storeActive();
+    }
+    cfg.name = active;
+    p[active] = clone(cfg);
+    if (!storePresets(p)) presetMsg('Браузер не дал сохранить пресет: хранилище недоступно. Скачайте JSON.', true);
+    renderPresets();
+  }
+  function presetConfig(key) {
+    const p = loadPresets();
+    if (key === EXAMPLE_KEY || !(key in p)) return null;
+    return F.fromJSON(JSON.stringify(Object.assign({}, p[key], { name: key })));
+  }
+  function renderPresets() {
+    const sel = $('#presetSel');
+    if (!sel) return;
+    const names = Object.keys(loadPresets()).sort((a, b) => a.localeCompare(b, 'ru'));
+    sel.innerHTML = `<option value="${EXAMPLE_KEY}">${esc(F.EXAMPLE.name)} (встроенный)</option>`
+      + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    sel.value = active;
+    const ex = active === EXAMPLE_KEY;
+    $('#presetRename').disabled = ex;
+    $('#presetDel').disabled = ex;
+    if (document.activeElement !== $('#presetName')) $('#presetName').value = ex ? '' : active;
+    $('#presetState').textContent = ex
+      ? 'Выбран встроенный пример: первая правка создаст из него новый пресет.'
+      : `Правки сохраняются в пресет «${active}» сразу.`;
+  }
+  function renderJson() {
+    const ta = $('#jsonText');
+    if (ta && document.activeElement !== ta) ta.value = JSON.stringify(cfg, null, 2);
+  }
+  // Применить готовые настройки: хранилище и пресет, редактор, процесс.
+  function useConfig(next, note, keep) {
+    cfg = next;
+    presetMsg(note);
+    save(); renderEditor(); renderPresets(); restart(keep);
+  }
+  function switchTo(key, note) {
+    let next;
+    try { next = presetConfig(key); } catch (e) { presetMsg(`Пресет «${key}» не читается: ${e.message}.`, true); renderPresets(); return; }
+    active = next ? key : EXAMPLE_KEY;
+    storeActive();
+    useConfig(next || clone(F.EXAMPLE), note || (next ? `Загружен пресет «${key}».` : 'Загружен встроенный пример.'));
+  }
+  // При открытии страницы — выбранный пресет. Настройки, изменённые до появления пресетов, не теряем: делаем из них пресет.
+  (function initPresets() {
+    let a = null;
+    try { a = localStorage.getItem(ACTIVE); } catch (e) { /* хранилище недоступно */ }
+    if (a && a !== EXAMPLE_KEY) {
+      try { const c = presetConfig(a); if (c) { active = a; cfg = c; return; } } catch (e) { /* испорченный пресет — откроем пример */ }
+    }
+    active = EXAMPLE_KEY;
+    if (!sameAsExample(cfg)) {
+      const p = loadPresets();
+      active = uniqueName(cfg.name && cfg.name !== F.EXAMPLE.name ? cfg.name : 'Мой пресет', p);
+      cfg.name = active; p[active] = clone(cfg); storePresets(p);
+    } else cfg = clone(F.EXAMPLE);
+    storeActive();
+  })();
+
+  const roleColor = id => { const i = cfg.roles.findIndex(r => r.id === id); return i < 0 ? 'var(--muted)' : `var(--s${(i % 8) + 1})`; };
+  const roleName = id => { const r = cfg.roles.find(x => x.id === id); return r ? r.name : '—'; };
+  const isAgent = p => !!(p.agent || p.kind === 'agent');
+  const personColor = p => (isAgent(p) ? 'var(--agent)' : 'var(--person)');
+  // Цвет домена (Client, Backend…) — точка у участника и домена в редакторе.
+  const domainList = () => cfg.domains || [];
+  // Цвет типа задачи — полоска на левом краю карточки; без своего — из палитры по порядку типов.
+  const TYPE_PALETTE = ['#5aa9e6', '#2f80d1', '#1d4f91', '#c77dd8', '#9b4fc0', '#6a2c91', '#e8833a', '#d64545', '#1aa37a', '#c99a00'];
+  const typeColor = (tp, list) => { if (!tp) return '#888888'; if (tp.color) return tp.color; const i = (list || (st ? st.cfg : cfg).types).indexOf(tp); return TYPE_PALETTE[(i < 0 ? 0 : i) % TYPE_PALETTE.length]; };
+  const domainColor = k => { const i = domainList().indexOf(k); return i < 0 ? '' : `var(--k${(i % 4) + 1})`; };
+  // Слова для зала: «Client M» на схеме читается как «Клиент M», баг всегда «Баг». Настройки не меняются.
+  const RU = { client: 'Клиент', backend: 'Бэкенд', frontend: 'Фронтенд' };
+  const ruWord = w => RU[String(w).toLowerCase()] || w;
+  const isBug = tp => !!tp && tp.id === F.BUG_ID;
+  const cardLabel = tp => (!tp ? '?' : isBug(tp) ? 'Баг' : String(tp.name).trim().split(/\s+/).map(ruWord).join(' '));
+  // Размер задачи по Story Points: толщина полоски в стопке.
+  const sizeOf = tp => { const sp = tp ? +tp.sp || 0 : 0; return sp >= 5 ? 'L' : sp >= 3 ? 'M' : 'S'; };
+  const taskDomain = t => { const tp = st.cfg.types[t.type]; return t.domain !== undefined ? t.domain : tp && tp.domain; };
+  const fitPx = (text, width, max, min) => Math.max(min, Math.min(max, width / (String(text).length * 0.6)));
+  const DOW = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
+  function clockLabel(t) {
+    const c = t + DAY_START, d = Math.floor(c / 24), h = Math.floor(c % 24), m = Math.floor((c * 60) % 60);
+    return `Спринт ${Math.floor(t / F.SPRINT_H) + 1} · день ${d + 1}, ${DOW[d % 7]} · ${pad(h)}:${pad(m)}`;
+  }
+  // Выходной у людей: рабочие сутки модели идут с 9:00, в неделе рабочие первые humanDays.
+  const humansRest = () => Math.floor(st.t / 24) % 7 >= st.cfg.humanDays;
+
+  // ---------- Часы ----------
+  // Обычный циферблат на 12 часов: 12 сверху, 3 справа, 6 снизу, 9 слева; часовая стрелка делает два оборота за сутки.
+  // Синяя дуга — рабочий день людей (с 9 до 5 при 8 часах), стоит на месте; в нерабочее время и в выходные бледнеет.
+  // Фиолетовая дуга внутри — часы агентов, если они работают не круглосуточно.
+  const clockHour = () => ((st.t + DAY_START) % 24 + 24) % 24;
+  const humanNow = () => { const p = st.people.find(x => !x.agent); return p ? F.isOn(st, p, st.t) : null; };
+  const agentNow = () => { const p = st.people.find(x => x.agent); return p ? F.isOn(st, p, st.t) : null; };
+  const dialKeyNow = () => `${humanNow()}|${agentNow()}|${st.people.some(p => !p.agent) && humansRest()}`;
+  function renderDial() {
+    const ang = h => ((h % 12) / 12 * 360 - 90) * Math.PI / 180;
+    const pt = (h, r) => [+(r * Math.cos(ang(h))).toFixed(2), +(r * Math.sin(ang(h))).toFixed(2)];
+    // Дуга от часа a длиной len часов; 12 и больше — полный круг.
+    const arc = (a, len, r, cls) => (len >= 12
+      ? `<circle class="${cls}" r="${r}"/>`
+      : `<path class="${cls}" d="M${pt(a, r)}A${r},${r} 0 ${len > 6 ? 1 : 0} 1 ${pt(a + len, r)}"/>`);
+    const humans = st.people.some(p => !p.agent), agents = st.people.some(p => p.agent);
+    const H = st.cfg.humanHours, A = st.cfg.agentHours, rest = humans && humansRest();
+    dialKey = dialKeyNow();
+    let h = `<circle class="face" r="33"/>`;
+    if (humans) h += `<circle class="track" r="29.5"/>` + arc(DAY_START, H, 29.5, `day${humanNow() ? '' : ' off'}`);
+    if (agents && A < 24) h += arc(DAY_START, A, 24.5, `work-a${agentNow() ? '' : ' off'}`);
+    for (let k = 1; k <= 12; k++) {
+      const [x1, y1] = pt(k, 21.5), [x2, y2] = pt(k, 24.5), [x, y] = pt(k, 16.9);
+      h += `<line class="tk" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/><text x="${x}" y="${(y + 2.2).toFixed(2)}" text-anchor="middle">${k}</text>`;
+    }
+    h += `<line id="hand" class="hand" x1="0" y1="3" x2="0" y2="-14"/><circle class="hub" r="2.8"/>`;
+    const span = len => (len >= 24 ? 'круглосуточно' : `${pad(DAY_START)}:00–${pad((DAY_START + len) % 24)}:00`);
+    h += `<title>Рабочее время: ${[humans ? 'люди ' + span(H) : '', agents ? 'агенты ' + span(A) : ''].filter(Boolean).join(', ')}</title>`;
+    $('#dial').innerHTML = h;
+  }
+  // Календарь недели рядом с часами: дни, выходные людей, сегодня и неделя спринта.
+  let weekKey = '';
+  function renderWeek() {
+    weekKey = '';
+    $('#week').innerHTML = DOW.map((d, i) => `<i data-d="${i}"${i >= st.cfg.humanDays ? ' class="rest" title="Выходной у людей"' : ''}>${d}</i>`).join('');
+  }
+  function paintWeek() {
+    const day = Math.floor((st.t + DAY_START) / 24), dow = day % 7;
+    const key = `${day}`;
+    if (key === weekKey) return;
+    weekKey = key;
+    $('#week').querySelectorAll('i').forEach((el, i) => {
+      el.classList.toggle('today', i === dow);
+      el.classList.toggle('past', i < dow);
+    });
+  }
+  function paintDial() {
+    if (dialKeyNow() !== dialKey) renderDial();
+    const hh = $('#hand');
+    if (hh) hh.setAttribute('transform', `rotate(${((clockHour() % 12) / 12 * 360).toFixed(2)})`);
   }
 
-  function renderPools() {
-    $('#pools').innerHTML = `<div class="pool-row hint"><span>Название</span><span>Человек</span><span></span></div>` + cfg.pools.map((p, i) => `
-      <div class="pool-row" data-pool="${i}">
-        <input type="text" id="pool-name-${esc(p.id)}" data-k="name" value="${esc(p.name)}" aria-label="Название роли">
-        <input type="number" id="pool-count-${esc(p.id)}" data-k="count" min="0" step="1" value="${p.count}" aria-label="Число людей">
-        <button class="icon-btn" type="button" data-act="del" title="Удалить роль" aria-label="Удалить роль"${cfg.pools.length < 2 ? ' disabled' : ''}>✕</button>
-      </div>`).join('');
+  // ---------- Схема ----------
+  function edgeSvg(key, d, head, title, cls) {
+    return `<g class="edge${cls || ''}" data-e="${key}"><title>${esc(title)}</title>
+      <path class="e-base" d="${d}"/><path class="e-head" d="${head}"/>
+      <g class="e-hot"><path class="e-line" d="${d}"/><path class="e-tip" d="${head}"/></g></g>`;
   }
 
-  function renderStages() {
-    const n = cfg.stages.length;
-    $('#stages').innerHTML = cfg.stages.map((s, i) => {
-      const earlier = cfg.stages.slice(0, i);
-      const rw = s.rework || { to: '', p: 20, pAgent: 25 };
-      const ag = s.agent || { on: false, speed: 10, count: 2, oversight: 1, oversightPool: s.pool };
-      const id = esc(s.id);
-      return `
-      <div class="stage" data-stage="${i}">
-        <div class="stage-head">
-          <span class="sw" style="background:${stageColor(i)}"></span>
-          <input type="text" id="st-name-${id}" data-k="name" value="${esc(s.name)}" aria-label="Название этапа">
-          <button class="icon-btn" type="button" data-act="up" title="Выше" aria-label="Выше"${i === 0 ? ' disabled' : ''}>↑</button>
-          <button class="icon-btn" type="button" data-act="down" title="Ниже" aria-label="Ниже"${i === n - 1 ? ' disabled' : ''}>↓</button>
-          <button class="icon-btn" type="button" data-act="del" title="Удалить этап" aria-label="Удалить этап"${n < 2 ? ' disabled' : ''}>✕</button>
-        </div>
-        <label class="field"><span>Кто делает</span><select id="st-pool-${id}" data-k="pool">${poolOptions(s.pool)}</select></label>
-        <div class="field"><span>Часов на задачу: мин · типично · макс</span>
-          <div class="row3">
-            <input type="number" id="st-min-${id}" data-k="min" min="0" step="0.25" value="${s.min}" aria-label="Минимум часов">
-            <input type="number" id="st-mode-${id}" data-k="mode" min="0" step="0.25" value="${s.mode}" aria-label="Типично часов">
-            <input type="number" id="st-max-${id}" data-k="max" min="0" step="0.25" value="${s.max}" aria-label="Максимум часов">
-          </div>
-        </div>
-        ${i > 0 ? `
-        <div class="field"><span>Возврат после этапа: куда · % · % если там агент</span>
-          <div class="row3">
-            <select id="st-rwto-${id}" data-k="rw.to" aria-label="Куда возвращать">
-              <option value="">нет</option>
-              ${earlier.map(e => `<option value="${esc(e.id)}"${e.id === rw.to ? ' selected' : ''}>${esc(e.name)}</option>`).join('')}
-            </select>
-            <input type="number" id="st-rwp-${id}" data-k="rw.p" min="0" max="99" step="1" value="${rw.p}" aria-label="Процент возвратов"${rw.to ? '' : ' disabled'}>
-            <input type="number" id="st-rwpa-${id}" data-k="rw.pAgent" min="0" max="99" step="1" value="${rw.pAgent ?? rw.p}" aria-label="Процент возвратов, если этап делал агент"${rw.to ? '' : ' disabled'}>
-          </div>
-        </div>` : ''}
-        <div class="agent" data-on="${!!ag.on}">
-          <label class="check"><input type="checkbox" id="st-agent-${id}" data-k="ag.on"${ag.on ? ' checked' : ''}><span>В сценарии B этап делает агент</span></label>
-          <div class="agent-body">
-            <div class="row3">
-              <label class="field"><span>Быстрее, ×</span><input type="number" id="st-agsp-${id}" data-k="ag.speed" min="0.1" step="0.5" value="${ag.speed}"></label>
-              <label class="field"><span>Агентов</span><input type="number" id="st-agn-${id}" data-k="ag.count" min="1" step="1" value="${ag.count}"></label>
-              <label class="field"><span>Проверка, ч</span><input type="number" id="st-agov-${id}" data-k="ag.oversight" min="0" step="0.25" value="${ag.oversight}"></label>
-            </div>
-            <label class="field"><span>Кто ставит задачу агенту и проверяет результат</span><select id="st-agpool-${id}" data-k="ag.oversightPool">${poolOptions(ag.oversightPool)}</select></label>
-          </div>
-        </div>
+  // Подпись этапа: только роль, детали — в подсказке при наведении.
+  function stageSub(s) {
+    if (!s.role) return s.limit ? `очередь, лимит ${s.limit}` : 'очередь';
+    const hs = st.cfg.types.filter(t => t.weight > 0).map(t => t.hours[s.id]).filter(h => h > 0);
+    const lo = Math.min(...hs), hi = Math.max(...hs);
+    const range = !hs.length ? 'пропуск' : lo === hi ? `${fmtH(lo)} ч` : `${fmtH(lo)}–${fmtH(hi)} ч`;
+    return `${range}, ${roleName(s.role)}`;
+  }
+  // Узкое место одно: этап роли-ограничителя, на котором задача проводит больше всего часов.
+  function neckStage() {
+    if (!fc || !fc.bottleneck) return -1;
+    const load = s => st.cfg.types.reduce((a, t) => a + (+t.weight || 0) * (+t.hours[s.id] || 0), 0);
+    let best = -1, top = -1;
+    st.cfg.stages.forEach((s, i) => { if (s.role === fc.bottleneck && load(s) > top) { top = load(s); best = i; } });
+    return best;
+  }
+  // Высота схемы подстраивается под экран, чтобы первый экран заполнялся целиком и ничего не обрезалось.
+  function flowHeight(W) {
+    const r = $('#flow').getBoundingClientRect();
+    return window.innerWidth >= 1000 && r.width > 0 && r.height > 200 ? Math.round(Math.max(520, Math.min(1200, W * r.height / r.width))) : 720;
+  }
+
+  function renderFlow() {
+    const S = st.cfg.stages, n = S.length;
+    const nw = Math.max(G.MIN, (G.W - 2 * G.PAD - G.DONE - n * G.GAP) / n);
+    const W = 2 * G.PAD + n * nw + n * G.GAP + G.DONE, H = flowHeight(W);
+    const nodes = S.map((s, i) => ({ i, w: nw })).concat([{ i: n, w: G.DONE, done: true }]);
+    let x = G.PAD;
+    nodes.forEach(nd => { nd.x = x; x += nd.w + G.GAP; });
+    // Дуги «баги» идут над этапами, под них нужен запас сверху.
+    const bugFrom = S.map((s, i) => (s.bugs && st.cfg.types.some(t => t.bugChance > 0) ? i : -1)).filter(i => i >= 0 && i !== st.bugEntry);
+    const y0 = bugFrom.length ? 76 : 30, NH = H - y0 - 6, cy = y0 + NH / 2;
+    const size = id => st.people.filter(p => p.role === id).length;
+    const rows = Math.max(1, ...S.filter(s => s.role).map(s => size(s.role)));
+    const ROW = Math.max(34, Math.min(G.ROW, NH * 0.42 / rows));
+    const waitTop = G.HEAD + rows * ROW + 28, floor = NH - 40;
+    const neck = neckStage();
+    const nameOf = j => (j >= n ? 'Готово' : S[j].name);
+    // Имена этапов одного размера: его задаёт самое длинное.
+    const fs = fitPx(S.reduce((a, s) => (s.name.length > a.length ? s.name : a), ''), nw - 2 * G.X, 34, 18);
+
+    let edges = '', boxes = '', ins = '';
+    for (let j = 0; j < n; j++) {
+      const x1 = nodes[j].x + nodes[j].w, x2 = nodes[j + 1].x, mx = (x1 + x2) / 2;
+      edges += edgeSvg('f' + j, `M${x1 + 4},${cy}H${x2 - 16}`, `M${x2 - 2},${cy}l-18,-11v22z`, `${nameOf(j)} → ${nameOf(j + 1)}`);
+      ins += `<g class="ins" data-ins="${j + 1}" tabindex="0" role="button" aria-label="${esc(`Вставить этап между «${nameOf(j)}» и «${nameOf(j + 1)}»`)}">
+        <title>Вставить этап</title><circle cx="${mx}" cy="${cy}" r="18"/><path d="M${mx - 8},${cy}h16M${mx},${cy - 8}v16"/></g>`;
+    }
+    bugFrom.forEach((i, k) => {
+      const a = nodes[i], b = nodes[st.bugEntry], h = 88 - 10 * k;
+      const sx = a.x + a.w / 2, tx = b.x + b.w / 2 + 12 * k;
+      edges += edgeSvg('bug' + i, `M${sx},${y0}C${sx},${y0 - h} ${tx},${y0 - h} ${tx},${y0 - 16}`, `M${tx},${y0 - 1}l-11,-18h22z`, `${S[i].name} находит баги — они уходят в «${S[st.bugEntry].name}»`, ' bug');
+      if (k === 0) { const mx = (sx + tx) / 2, ly = y0 - 0.75 * h; edges += `<rect class="bug-pill" x="${mx - 92}" y="${ly - 17}" width="184" height="34"/><text class="bug-lbl" x="${mx}" y="${ly + 9}" text-anchor="middle">Баги обратно</text>`; }
+    });
+    nodes.forEach(nd => {
+      const { x: nx } = nd, tx = nx + G.X, iw = nd.w - 2 * G.X;
+      if (nd.done) {
+        boxes += `<g class="node term"><rect class="n-box" x="${nx}" y="${y0}" width="${nd.w}" height="${NH}" rx="16"/>
+          <text class="n-name" x="${tx}" y="${y0 + 48}" style="font-size:32px">Готово</text><g data-dyn="done"></g></g>`;
+        return;
+      }
+      const s = S[nd.i], sub = stageSub(s), rl = s.role ? roleLoad(s.role) : null, hot = nd.i === neck;
+      const ldTitle = rl && rl.load > 0 ? `, загрузка ${roleName(s.role)} ${pctTxt(rl.util)}${rl.limitBy ? ', упирается в ' + rl.limitBy : ''}` : '';
+      const line = hot && rl && rl.limitBy ? `не хватает: ${ruWord(rl.limitBy)}` : s.role ? roleName(s.role) : '';
+      const body = s.role
+        ? `<rect class="n-box" x="${nx}" y="${y0}" width="${nw}" height="${NH}" rx="16"/>`
+        : `<rect class="n-box" x="${nx}" y="${y0}" width="${nw}" height="${NH}" rx="16"/><path class="tray" d="M${nx + 2},${y0 + 8}V${y0 + NH - 18}q0,16 16,16H${nx + nw - 18}q16,0 16,-16V${y0 + 8}"/>`;
+      const tab = hot ? `<rect class="neck-tab" x="${tx - 2}" y="${y0 - 26}" width="${Math.min(iw + 4, 202)}" height="50" rx="10"/><text class="neck-t" x="${tx + 11}" y="${y0 + 9}" style="font-size:${fitPx('Узкое место', Math.min(iw + 4, 202) - 22, 27, 16).toFixed(1)}px">Узкое место</text>` : '';
+      boxes += `<g class="node st${s.role ? '' : ' queue'}${hot ? ' is-neck' : ''}${s.id === fresh ? ' fresh' : ''}" data-node="${nd.i}" tabindex="0" role="button" aria-label="${esc(s.name)}: открыть в редакторе">
+        <title>${esc(s.name)}: ${esc(sub)}${esc(ldTitle)}</title>
+        ${body}
+        <text class="n-name" x="${tx}" y="${y0 + 62}" style="font-size:${fs.toFixed(1)}px">${esc(clip(s.name, 22))}</text>
+        <text class="n-sub${hot && rl && rl.limitBy ? ' neck-sub' : ''}" x="${tx}" y="${y0 + 94}">${esc(clip(line, Math.floor(iw / 12)))}</text>
+        ${tab}
+        <g data-dyn="${nd.i}"></g></g>`;
+    });
+
+    $('#flow').innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="min-width:${Math.round(W * 0.56)}px" role="group" aria-label="Схема процесса">
+      <g>${edges}</g><g>${boxes}</g><g>${ins}</g><g class="fly"></g></svg>`;
+    const svg = $('#flow svg');
+    geo = { nodes, H, nw, y0, NH, ROW, waitTop, floor, dyn: {}, e: {}, fly: svg.querySelector('.fly') };
+    svg.querySelectorAll('[data-dyn]').forEach(g => { geo.dyn[g.dataset.dyn] = g; });
+    svg.querySelectorAll('[data-e]').forEach(g => { geo.e[g.dataset.e] = { hot: g.querySelector('.e-hot'), path: g.querySelector('.e-base') }; });
+    flights.length = 0; flightEnd.clear();
+    dirty = true;
+    // Новый этап: подсветить стрелки в него и из него.
+    const fi = fresh ? S.findIndex(s => s.id === fresh) : -1;
+    fresh = null;
+    if (fi >= 0) { blink(geo.e['f' + (fi - 1)]); blink(geo.e['f' + fi]); }
+  }
+
+  function chipTitle(task) {
+    const tp = st.cfg.types[task.type];
+    const d = task.domain !== undefined ? task.domain : tp && tp.domain;
+    return `#${task.id} · ${tp ? tp.name : ''}${d ? ' · ' + d : ''}${tp && !tp.agents ? ' · только люди' : ''}`;
+  }
+  // Карточка в работе: цвет — кто работает (человек, агент) или баг; заливка слева направо — сколько сделано.
+  function card(x, y, w, h, task, kind, prog, off) {
+    const tp = st.cfg.types[task.type], fs = Math.min(22, h * 0.5), pad = 16;
+    const cls = isBug(tp) ? 'c-bug' : kind, fw = (w * prog).toFixed(1), id = `c${task.id}`;
+    const tx = x + pad, ty = (y + h / 2 + fs * 0.36).toFixed(1), label = esc(clip(cardLabel(tp), Math.floor((w - pad - 6) / (fs * 0.58))));
+    // Подпись читается и на заливке, и на подложке: над заливкой она контрастного цвета.
+    return `<g><title>${esc(chipTitle(task))}</title>
+      <clipPath id="${id}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8"/></clipPath>
+      <clipPath id="${id}f"><rect x="${x}" y="${y}" width="${fw}" height="${h}"/></clipPath>
+      <g clip-path="url(#${id})"><rect class="${cls} c-bg" x="${x}" y="${y}" width="${w}" height="${h}"/>
+      <rect class="${cls}${off ? ' c-bg' : ''}" x="${x}" y="${y}" width="${fw}" height="${h}"/>
+      <rect x="${x}" y="${y}" width="8" height="${h}" style="fill:${typeColor(tp)}"/></g>
+      <text class="c-t" x="${tx}" y="${ty}" style="font-size:${fs.toFixed(1)}px">${label}</text>
+      ${off ? '' : `<text class="c-t on" clip-path="url(#${id}f)" x="${tx}" y="${ty}" style="font-size:${fs.toFixed(1)}px">${label}</text>`}</g>`;
+  }
+  // Значок участника: человек — круг, агент — квадрат.
+  function avatar(cx, cy, r, p, off) {
+    const tip = `<title>${esc(p.name)}${isAgent(p) ? ', ИИ-агент' : ''}${off ? ', нерабочее время' : ''}</title>`;
+    const shape = isAgent(p)
+      ? `<rect class="ai" x="${cx - r}" y="${cy - r}" width="${2 * r}" height="${2 * r}" rx="7">${tip}</rect>`
+      : `<circle class="hum" cx="${cx}" cy="${cy}" r="${r}">${tip}</circle>`;
+    return `${shape}<text class="av" x="${cx}" y="${(cy + r * 0.34).toFixed(1)}" text-anchor="middle" style="font-size:${(r * (String(p.label).length > 2 ? 0.68 : 0.9)).toFixed(1)}px">${esc(p.label)}</text>`;
+  }
+  // Дорожки стопки: по домену задачи, чтобы было видно, чего ждёт очередь. Доменов нет или много — одна стопка.
+  function lanesOf(tasks) {
+    const ds = domainList();
+    if (!ds.length || ds.length > 3) return [{ label: '', tasks }];
+    const lanes = ds.map(d => ({ key: d, label: ruWord(d), tasks: [] }));
+    if (st.cfg.types.some(t => t.weight > 0 && !t.domain)) lanes.push({ key: '', label: 'Любые', tasks: [] });
+    tasks.forEach(t => { (lanes.find(l => l.key === (taskDomain(t) || '')) || lanes[lanes.length - 1]).tasks.push(t); });
+    return lanes;
+  }
+  let pileTop = 0; // вершина самой высокой стопки этапа
+  // Стопка растёт от пола вверх; не влезает — полоски сжимаются, масса остаётся.
+  function pile(tasks, x, w, top, floor, cls) {
+    const hs = tasks.map(t => SLAB[sizeOf(st.cfg.types[t.type])]);
+    const total = hs.reduce((a, b) => a + b + SLAB_GAP, 0), k = total ? Math.min(1, (floor - top) / total) : 1;
+    let y = floor - SLAB_GAP * k, h = '';
+    pileTop = Math.min(pileTop, floor - total * k);
+    tasks.forEach((t, i) => {
+      const sh = Math.max(1.5, hs[i] * k), tp = st.cfg.types[t.type];
+      y -= sh;
+      h += `<rect class="${isBug(tp) && cls !== 'c-done' ? 'c-bug' : cls}" x="${x}" y="${y.toFixed(1)}" width="${w}" height="${sh.toFixed(1)}" rx="${Math.min(3, sh / 2).toFixed(1)}"><title>${esc(chipTitle(t))}</title></rect>`;
+      y -= SLAB_GAP * k;
+    });
+    return h;
+  }
+  function piles(tasks, x, w, top, floor) {
+    const lanes = lanesOf(tasks), gap = 14, lw = (w - gap * (lanes.length - 1)) / lanes.length;
+    return lanes.map((l, i) => {
+      const lx = x + i * (lw + gap);
+      return `<line class="floor" x1="${lx}" x2="${lx + lw}" y1="${floor}" y2="${floor}"/>`
+        + (l.label ? `<text class="lane-t" x="${lx + lw / 2}" y="${floor + 24}" text-anchor="middle">${esc(clip(l.label, Math.floor(lw / 10)))}</text>` : '')
+        + pile(l.tasks, lx, lw, top, floor, 'c-wait');
+    }).join('');
+  }
+
+  function paint(now) {
+    const S = st.cfg.stages, { y0, nw, ROW, NH } = geo, iw = nw - 2 * G.X;
+    const flying = new Set(flights.filter(f => now < f.t0 + f.dur).map(f => f.task.id));
+    S.forEach((s, i) => {
+      const x = geo.nodes[i].x + G.X;
+      const here = st.tasks.filter(t => t.stage === i);
+      const wait = here.filter(t => t.state === 'wait' && !flying.has(t.id));
+      const floor = y0 + geo.floor;
+      let h = '';
+      if (s.role) {
+        here.filter(t => t.state === 'work').forEach((t, r) => {
+          const p = st.people.find(q => q.id === t.person), yy = y0 + G.HEAD + r * ROW, ch = ROW - 12, rad = ch / 2;
+          const prog = t.total ? Math.min(1, 1 - t.left / t.total) : 0, off = !F.isOn(st, p, st.t);
+          h += `<g${off ? ' class="off"' : ''}>${avatar(x + rad, yy + rad, rad, p, off)}</g>
+            ${flying.has(t.id) ? '' : card(x + ch + 10, yy, iw - ch - 10, ch, t, isAgent(p) ? 'c-agent' : 'c-work', prog, off)}`;
+        });
+        if (i > 0) {
+          const wy = y0 + geo.waitTop;
+          if (wait.length) {
+            pileTop = floor;
+            h += piles(wait, x, iw, wy + 14, floor);
+            h += `<text class="n-cnt" x="${x}" y="${(pileTop - 12).toFixed(1)}">Ждут ${wait.length}</text>`;
+          }
+        }
+      } else {
+        const big = fitPx(wait.length, iw * 0.5, 66, 36) * 1.0;
+        h += `<text class="n-big" x="${x}" y="${y0 + 170}" style="font-size:${big.toFixed(1)}px">${wait.length}${s.limit ? `<tspan class="n-of" dx="12">из ${s.limit}</tspan>` : ''}</text>`;
+        h += piles(wait, x, iw, y0 + 190, floor);
+      }
+      geo.dyn[i].innerHTML = h;
+    });
+    const dn = geo.nodes[S.length], tx = dn.x + G.X, dw = G.DONE - 2 * G.X, big = fitPx(st.doneCount, dw * 0.72, 66, 30);
+    geo.dyn.done.innerHTML = `<text class="n-big" x="${tx}" y="${y0 + 134}" style="font-size:${big.toFixed(1)}px">${st.doneCount}</text>`
+      + pile(st.done.slice(-14), tx, dw, y0 + 160, y0 + NH - 18, 'c-done');
+
+    // Летящие карточки: полоска едет по стрелке к следующей стопке.
+    let fh = '';
+    for (let k = flights.length - 1; k >= 0; k--) {
+      const f = flights[k], u = (now - f.t0) / f.dur;
+      if (u >= 1) { flights.splice(k, 1); continue; }
+      if (u < 0) continue;
+      if (!f.fired) { f.fired = true; blink(f.edge); }
+      const pt = f.edge.path.getPointAtLength(f.edge.len * (1 - (1 - u) * (1 - u)));
+      const tp = st.cfg.types[f.task.type], cls = isBug(tp) ? 'c-bug' : f.done ? 'c-done' : 'c-wait', cw = 84, ch = SLAB[sizeOf(tp)] + 8;
+      fh += `<rect class="${cls}" x="${(pt.x - cw / 2).toFixed(1)}" y="${(pt.y - ch / 2).toFixed(1)}" width="${cw}" height="${ch}" rx="4"/>`;
+    }
+    geo.fly.innerHTML = fh;
+
+    const human = st.people.find(p => !p.agent);
+    const on = human && F.isOn(st, human, st.t);
+    const c = st.t + DAY_START, d = Math.floor(c / 24);
+    const nowTxt = `${pad(Math.floor(c % 24))}:${pad(Math.floor((c * 60) % 60))}`;
+    const clockTxt = `Спринт ${Math.floor(st.t / F.SPRINT_H) + 1}, день ${d + 1}`;
+    const subTxt = !human ? '' : on ? 'Люди работают' : humansRest() ? 'У людей выходной' : 'Люди отдыхают';
+    if ($('#clockNow').textContent !== nowTxt) $('#clockNow').textContent = nowTxt;
+    if ($('#clock').textContent !== clockTxt) $('#clock').textContent = clockTxt;
+    const sub = $('#clock-sub');
+    if (sub.textContent !== subTxt) { sub.textContent = subTxt; sub.classList.toggle('rest', !on); }
+    paintDial();
+    paintWeek();
+    paintCrew();
+    paintVel();
+  }
+
+  // ---------- Загрузка ----------
+  const loadLevel = u => (u >= 0.95 ? 'hot' : u >= 0.8 ? 'warm' : u >= 0.5 ? 'ok' : 'cold');
+  const loadWord = { hot: 'узкое место', warm: 'близко к пределу', ok: 'норма', cold: 'недогружен' };
+  const pctTxt = u => `${Math.round(u * 100)}%`;
+  const roleLoad = id => (fc ? fc.roles.find(r => r.id === id) : null);
+  // Загрузка ролей по расчёту: столбики в панели SP за спринт.
+  function renderLoads() {
+    const rows = fc.roles.filter(r => r.load > 0).sort((a, b) => b.util - a.util);
+    $('#velLoads').innerHTML = '<div class="lh">Загрузка ролей при работе на пределе</div>' + rows.map(r => {
+      const lv = loadLevel(r.util);
+      return `<div class="load-row lv-${lv}" title="${esc(roleName(r.id))}: ${pctTxt(r.util)} — ${loadWord[lv]}${r.limitBy ? ', упирается в ' + esc(r.limitBy) : ''}">
+        <span>${esc(roleName(r.id))}${r.limitBy ? ` <small>· ${esc(r.limitBy)}</small>` : ''}</span><span class="ld">${pctTxt(r.util)}</span>
+        <span class="bar"><span style="width:${Math.min(100, r.util * 100).toFixed(0)}%"></span></span></div>`;
+    }).join('');
+  }
+
+  // ---------- Story Points за спринт ----------
+  const fmt1 = x => (Number.isFinite(x) ? x.toLocaleString('ru-RU', { maximumFractionDigits: 1 }) : '—');
+  function niceMax(v) {
+    if (v <= 0) return 10;
+    const p = Math.pow(10, Math.floor(Math.log10(v))), m = v / p;
+    return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p;
+  }
+  // SP по спринтам: прошедшие и текущий. Оценка после спринта k — среднее прошедших без первого, пока он не единственный.
+  function velData() {
+    const cur = Math.floor(st.t / F.SPRINT_H);
+    const vals = Array.from({ length: cur + 1 }, (_, k) => st.sprints[k] || 0);
+    // Оценка после спринта k — среднее за последние 3 прошедших спринта (первый, разгонный, — только пока он один):
+    // так оценка догоняет ускорение после изменения команды, а не размазывает его по всей истории.
+    const est = vals.slice(0, cur).map((_, k) => { const a = k === 0 ? vals.slice(0, 1) : vals.slice(Math.max(1, k - 2), k + 1); return a.reduce((x, y) => x + y, 0) / a.length; });
+    return { cur, vals, est, day: Math.floor((st.t % F.SPRINT_H) / 24) + 1 };
+  }
+  function paintVel() {
+    const d = velData();
+    const sig = `${(st.changes || []).length}|${d.vals.join(',')}|${d.day}|${fc && fc.spPerSprint}|${fc && fc.cost.total}|${fcWas}|${st.bugsFound}|${st.cfg.currency}`;
+    if (sig === velSig) return;
+    velSig = sig;
+    const bnRole = fc && fc.bottleneck ? roleLoad(fc.bottleneck) : null;
+    const bn = bnRole ? roleName(bnRole.id) + (bnRole.limitBy ? ` (${bnRole.limitBy})` : '') : '—';
+    const last = d.est.length ? d.est[d.est.length - 1] : null;
+    const was = fcWas != null && Math.abs(fcWas - fc.spPerSprint) > 0.05;
+    $('#velStats').innerHTML = `
+      <div class="stat"><span>Расчёт</span><b>${fmt1(fc.spPerSprint)}<small>SP за спринт</small></b>
+        <small>≈ ${fmt1(fc.tasksPerSprint)} задач по ${fmt1(fc.spPerTask)} SP, узкое место — ${esc(bn)}</small>
+        ${fc.bugsPerSprint > 0.05 ? `<small class="bugs">из них ≈ ${fmt1(fc.bugsPerSprint)} багов от QA</small>` : ''}
+        ${was ? `<small class="was">было ${fmt1(fcWas)} SP до изменения (${fc.spPerSprint >= fcWas ? '+' : '−'}${fmt1(Math.abs(fc.spPerSprint - fcWas))})</small>` : ''}</div>
+      <div class="stat"><span>По прошедшим спринтам</span><b>${last == null ? '—' : fmt1(last)}<small>${last == null ? 'после первого спринта' : 'SP за спринт'}</small></b>
+        <small>${d.cur === 0 ? 'первый спринт ещё идёт' : d.cur === 1 ? 'пока один спринт, в нём процесс разгонялся' : (d.cur <= 3 ? `среднее за спринты 2–${d.cur}` : `среднее за спринты ${d.cur - 2}–${d.cur}`)}</small></div>
+      <div class="stat"><span>Спринт ${d.cur + 1} идёт</span><b>${fmt1(d.vals[d.cur])}<small>SP</small></b><small>день ${d.day} из 14${st.bugsFound ? ` · багов от QA с начала: ${st.bugsFound}` : ''}</small></div>
+      ${costStat(d)}`;
+    paintKpis(d);
+    $('#velChart').innerHTML = velChart(d, was);
+    $('#velLegend').innerHTML = '<span><i class="l-bar"></i>SP за спринт</span><span><i class="l-est"></i>оценка по прошедшим спринтам</span><span><i class="l-fc"></i>расчёт</span>' + (was ? '<span><i class="l-was"></i>расчёт до изменения</span>' : '') + ((st.changes || []).length ? '<span><i class="l-chg"></i>изменение настроек</span>' : '');
+  }
+  // Главные цифры первого экрана.
+  function paintKpis(d) {
+    const c = fc.cost, cur = esc(st.cfg.currency || '$'), money = v => `${cur}${Math.round(v).toLocaleString('ru-RU')}`;
+    const cost = c.total > 0 ? `<b>${money(c.total)}</b><small>${Number.isFinite(c.perSP) ? money(c.perSP) + ' за SP' : ''}</small>` : '<b>—</b><small>ставки не заданы</small>';
+    $('#kpis').innerHTML = `
+      <div class="kpi"><span>SP за спринт</span><b>${fmt1(fc.spPerSprint)}</b><small>сделано ${fmt1(d.vals[d.cur])}</small></div>
+      <div class="kpi"><span>Цена спринта</span>${cost}</div>
+      <div class="kpi bugs"><span>Багов найдено</span><b>${st.bugsFound || 0}</b><small>≈ ${fmt1(fc.bugsPerSprint)} за спринт</small></div>`;
+  }
+  // Стоимость: расчёт спринта, цена SP и простой людей; по факту — за прошедшие спринты без первого.
+  function costStat(d) {
+    const c = fc.cost, cur = esc(st.cfg.currency || '$'), money = v => `${cur}${Math.round(v).toLocaleString('ru-RU')}`;
+    if (!(c.total > 0)) return '<div class="stat"><span>Стоимость</span><small>Задайте ставки в команде, чтобы считать цену спринта и SP.</small></div>';
+    const from = Math.max(1, d.cur - 3), done = d.vals.slice(from, d.cur), costs = (st.sprintCost || []).slice(from, d.cur);
+    const factSP = done.reduce((a, x) => a + x, 0), factCost = costs.reduce((a, x) => a + x, 0);
+    const fact = done.length ? `по факту: ${money(factCost / done.length)} за спринт, ${factSP ? money(factCost / factSP) : '—'} за SP` : 'по факту — после второго спринта';
+    return `<div class="stat"><span>Стоимость спринта</span><b>${money(c.total)}<small>${Number.isFinite(c.perSP) ? money(c.perSP) + ' за SP' : ''}</small></b>
+      <small>люди ${money(c.humans)}${c.agents ? `, агенты ${money(c.agents)}` : ''} · простой людей ≈ ${money(c.idle)}</small>
+      <small>${fact}</small></div>`;
+  }
+  function velChart(d, was) {
+    // Ширина в единицах SVG равна ширине блока, чтобы подписи не мельчали на телефоне.
+    const W = Math.max(320, Math.min(760, $('#velChart').clientWidth || 640)), H = 200, M = { l: 34, r: 70, t: 14, b: 24 }, pw = W - M.l - M.r, ph = H - M.t - M.b;
+    const from = Math.max(0, d.vals.length - 12), slots = Math.max(6, d.vals.length - from), sw = pw / slots;
+    const yMax = niceMax(Math.max(...d.vals, ...d.est, fc.spPerSprint, was ? fcWas : 0) * 1.1);
+    const X = k => M.l + (k - from + 0.5) * sw, Y = v => M.t + ph - v / yMax * ph;
+    let h = '<g class="ax">';
+    for (let j = 0; j <= 4; j++) { const v = yMax / 4 * j; h += `<line x1="${M.l}" x2="${M.l + pw}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${M.l - 6}" y="${Y(v) + 3.5}" text-anchor="end">${fmt1(v)}</text>`; }
+    for (let k = from; k < from + slots; k++) h += `<text x="${X(k)}" y="${H - 6}" text-anchor="middle">С${k + 1}</text>`;
+    h += '</g>';
+    d.vals.forEach((v, k) => {
+      if (k < from) return;
+      const bw = sw * 0.6, cur = k === d.cur;
+      h += `<rect class="bar${cur ? ' cur' : ''}" x="${(X(k) - bw / 2).toFixed(1)}" y="${Y(v).toFixed(1)}" width="${bw.toFixed(1)}" height="${(M.t + ph - Y(v)).toFixed(1)}" rx="3"><title>Спринт ${k + 1}${cur ? ' (идёт)' : ''}: ${fmt1(v)} SP</title></rect>`;
+      if (v > 0) h += `<text class="bar-v" x="${X(k)}" y="${(Y(v) - 4).toFixed(1)}" text-anchor="middle">${fmt1(v)}</text>`;
+    });
+    // Подпись «было» уводим от подписи расчёта, если линии рядом.
+    const yWas = was ? (Math.abs(Y(fcWas) - Y(fc.spPerSprint)) < 13 ? Y(fc.spPerSprint) + (fcWas <= fc.spPerSprint ? 13 : -13) : Y(fcWas)) : 0;
+    if (was) h += `<line class="was" x1="${M.l}" x2="${M.l + pw}" y1="${Y(fcWas)}" y2="${Y(fcWas)}"/><text class="was-t" x="${M.l + pw + 6}" y="${yWas + 3.5}">было ${fmt1(fcWas)}</text>`;
+    h += `<line class="fc" x1="${M.l}" x2="${M.l + pw}" y1="${Y(fc.spPerSprint)}" y2="${Y(fc.spPerSprint)}"/><text class="fc-t" x="${M.l + pw + 6}" y="${Y(fc.spPerSprint) + 3.5}">расчёт ${fmt1(fc.spPerSprint)}</text>`;
+    // Отметки изменений настроек: момент правки в редакторе.
+    (st.changes || []).forEach(t => {
+      const k = t / F.SPRINT_H;
+      if (k < from) return;
+      const xc = M.l + (k - from) * sw;
+      h += `<line class="chg" x1="${xc.toFixed(1)}" x2="${xc.toFixed(1)}" y1="${M.t}" y2="${M.t + ph}"><title>Изменение настроек: ${clockLabel(t)}</title></line>`;
+    });
+    const pts = d.est.map((v, k) => [k, v]).filter(([k]) => k >= from);
+    if (pts.length) {
+      h += `<polyline class="est" points="${pts.map(([k, v]) => `${X(k).toFixed(1)},${Y(v).toFixed(1)}`).join(' ')}"/>`;
+      h += pts.map(([k, v]) => `<circle class="est-d" cx="${X(k).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="3"><title>Оценка после спринта ${k + 1}: ${fmt1(v)} SP</title></circle>`).join('');
+    }
+    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Story Points по спринтам, оценка и расчёт">${h}</svg>`;
+  }
+
+  // Строка команды: чем занят каждый участник прямо сейчас и сколько этапов сделал.
+  function renderCrew() {
+    $('#idle').innerHTML = st.people.map((p, i) => `<span class="person" data-p="${i}">
+      <span class="av-h${isAgent(p) ? ' agent' : ''}" style="background:${personColor(p)}">${esc(p.label)}</span><span class="pn">${esc(p.name)}</span>
+      <span class="ld na" title="Фактическая загрузка: занятая доля рабочего времени">—</span><small class="ps"></small><small class="pd num" title="Сделано этапов"></small></span>`).join('');
+    crewEls = [...document.querySelectorAll('#idle [data-p]')].map(el => ({ el, av: el.querySelector('.av-h'), st: el.querySelector('.ps'), done: el.querySelector('.pd'), ld: el.querySelector('.ld') }));
+  }
+  function paintCrew() {
+    st.people.forEach((p, i) => {
+      const e = crewEls[i];
+      if (!e) return;
+      const t = p.task != null ? F.taskById(st, p.task) : null, off = !F.isOn(st, p, st.t);
+      let txt = p.idle || 'свободен';
+      if (t) {
+        const tp = st.cfg.types[t.type], prog = t.total ? Math.min(1, 1 - t.left / t.total) : 0;
+        txt = `${st.cfg.stages[t.stage].name}, ${cardLabel(tp)} ${Math.round(prog * 100)}%${off ? ', ждёт утра' : ''}`;
+      }
+      const tip = (!t && p.idleWhy) || txt;
+      if (e.st.textContent !== txt) e.st.textContent = txt;
+      if (e.st.title !== tip) e.st.title = tip;
+      const d = `✓ ${p.done}`;
+      if (e.done.textContent !== d) e.done.textContent = d;
+      e.el.classList.toggle('busy', !!t && !off);
+      e.el.classList.toggle('off', off);
+      // Фактическая загрузка — после первого рабочего дня, раньше доля ещё ничего не значит.
+      if (p.onH >= 8) {
+        const u = p.busyH / p.onH, lv = loadLevel(u), cls = `ld lv-${lv}`, txt = pctTxt(u);
+        if (e.ld.className !== cls) { e.ld.className = cls; e.ld.title = `Фактическая загрузка: ${txt} рабочего времени занят — ${loadWord[lv]}`; }
+        if (e.ld.textContent !== txt) e.ld.textContent = txt;
+      }
+    });
+  }
+  // Участник взял задачу — его аватар в строке команды коротко мигает.
+  function pulseCrew(personId) {
+    const e = crewEls[st.people.findIndex(p => p.id === personId)];
+    if (!e || reduceMotion()) return;
+    e.av.animate([{ transform: 'scale(1.45)' }, { transform: 'scale(1)' }], { duration: 450, easing: 'ease-out' });
+  }
+
+  function blink(e) {
+    if (!e) return;
+    e.hot.getAnimations().forEach(a => a.cancel());
+    e.hot.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 900, easing: 'ease-out' });
+  }
+
+  // Переход задачи — карточка летит по стрелке. Цепочка переходов одной задачи идёт друг за другом.
+  function onEvents(ev, now) {
+    const S = st.cfg.stages;
+    const dur = reduceMotion() ? 0 : FLIGHT_MS;
+    const types = new Map();
+    ev.forEach(e => { if (e.type === 'new') types.set(e.task, e.kind); if (e.type === 'start') pulseCrew(e.person); });
+    ev.forEach(e => {
+      // Баг от QA летит по красной дуге в бэклог.
+      if (e.type === 'new' && e.bug) {
+        const edge = geo.e['bug' + e.from];
+        if (!edge) return;
+        if (!dur) { blink(edge); return; }
+        if (edge.len == null) edge.len = edge.path.getTotalLength();
+        const t0 = Math.max(now, flightEnd.get(e.task) || 0);
+        flights.push({ task: F.taskById(st, e.task) || { id: e.task, type: e.kind, domain: e.domain }, edge, t0, dur, color: true, fired: false });
+        flightEnd.set(e.task, t0 + dur);
+        return;
+      }
+      if (e.type !== 'move' && e.type !== 'done') return;
+      const edge = geo.e['f' + e.from];
+      if (!edge) return;
+      if (!dur) { blink(edge); return; }
+      if (edge.len == null) edge.len = edge.path.getTotalLength();
+      const task = F.taskById(st, e.task) || (st.done.find(d => d.id === e.task)) || { id: e.task, type: types.get(e.task) || 0 };
+      const t0 = Math.max(now, flightEnd.get(e.task) || 0);
+      flights.push({ task, edge, t0, dur, done: e.type === 'done', fired: false });
+      flightEnd.set(e.task, t0 + dur);
+    });
+    if (flightEnd.size > 400) flightEnd.clear();
+  }
+
+  function loop(ts) {
+    const dt = lastTs ? Math.min(0.1, (ts - lastTs) / 1000) : 0;
+    lastTs = ts;
+    if (playing && dt > 0) {
+      const ev = F.step(st, dt * +$('#speed').value);
+      if (ev.length) onEvents(ev, ts);
+      dirty = true;
+    }
+    if (dirty || flights.length) { paint(ts); dirty = false; }
+    requestAnimationFrame(loop);
+  }
+
+  // keep — продолжить процесс с новыми настройками (правка в редакторе); без него — начать с нуля
+  // («Заново», смена пресета, «Вернуть пример»).
+  function restart(keep) {
+    const next = F.forecast(cfg);
+    if (fc && Math.abs(fc.spPerSprint - next.spPerSprint) > 0.05) fcWas = fc.spPerSprint;
+    fc = next; velSig = '';
+    st = keep === true && st ? F.reconfigure(st, cfg) : F.create(cfg);
+    renderDial();
+    renderWeek();
+    renderCrew();
+    renderFlow();
+    renderLoads();
+  }
+  let timer = null;
+  function changed() {
+    save();
+    clearTimeout(timer);
+    timer = setTimeout(() => restart(true), 150);
+  }
+  // Переименование не перезапускает процесс: обновляем подписи на лету.
+  function renamed() {
+    save();
+    const n = F.normalize(cfg);
+    st.cfg.stages.forEach((s, i) => { if (n.stages[i]) s.name = n.stages[i].name; });
+    st.cfg.roles.forEach((r, i) => { if (n.roles[i]) r.name = n.roles[i].name; });
+    st.cfg.types.forEach((t, i) => { if (n.types[i]) t.name = n.types[i].name; });
+    const next = F.create(cfg);
+    st.people.forEach(p => { const q = next.people.find(x => x.id === p.id); if (q) { p.name = q.name; p.label = q.label; } });
+    renderCrew();
+    renderFlow();
+    renderLoads();
+  }
+
+  // ---------- Редактор ----------
+  function roleOptions(sel) { return cfg.roles.map(r => `<option value="${esc(r.id)}"${r.id === sel ? ' selected' : ''}>${esc(r.name)}</option>`).join(''); }
+
+  function renderTeam() {
+    const n = F.normalize(cfg);
+    ['humanHours', 'agentHours', 'humanDays', 'agentDays', 'currency', 'agentRate'].forEach(id => { if (document.activeElement !== $('#' + id)) $('#' + id).value = n[id]; });
+    const labels = F.create(cfg).people;
+    $('#team').innerHTML = `<div class="m-row head"><span></span><span title="В работе">Вкл</span><span></span><span>Имя</span><span>Роль</span><span>Кто</span><span>Домены</span><span>Быстрее</span><span>Ставка</span><span></span></div>` + cfg.team.map((m, i) => {
+      const id = esc(m.id), ag = m.kind === 'agent', p = labels.find(x => x.id === m.id);
+      const ds = domainList(), all = !Array.isArray(m.domains), own = all ? ds : m.domains;
+      const on = m.active !== false;
+      return `<div class="m-row${on ? '' : ' inactive'}" data-member="${i}">
+        <span class="grip" draggable="true" title="Перетащите, чтобы поменять порядок" aria-hidden="true">⠿</span>
+        <span class="on"><input type="checkbox" id="tm-on-${id}" data-k="active"${on ? ' checked' : ''} title="${on ? 'В работе — снимите, чтобы отключить' : 'Отключён — отметьте, чтобы вернуть в работу'}" aria-label="${esc(m.name)} в работе"></span>
+        <span class="av-h${ag ? ' agent' : ''}" style="background:${personColor(m)}">${esc(p ? p.label : ag ? 'ИИ' : F.initials(m.name))}</span>
+        <input class="nm" type="text" id="tm-name-${id}" data-k="name" value="${esc(m.name)}" aria-label="Имя">
+        <select class="rl" id="tm-role-${id}" data-k="role" aria-label="Роль">${roleOptions(m.role)}</select>
+        <select class="kd" id="tm-kind-${id}" data-k="kind" aria-label="Человек или агент">
+          <option value="human"${ag ? '' : ' selected'}>Человек</option><option value="agent"${ag ? ' selected' : ''}>ИИ-агент</option>
+        </select>
+        <span class="sk">${ds.length ? `<label class="all" title="Все домены, в том числе добавленные потом"><input type="checkbox" id="tm-all-${id}" data-k="dom-all"${all ? ' checked' : ''}>все</label>`
+          + ds.map(k => `<label title="Берёт задачи домена ${esc(k)}"><input type="checkbox" id="tm-dom-${id}-${esc(k)}" data-k="dom:${esc(k)}"${own.includes(k) ? ' checked' : ''}${all ? ' disabled' : ''}><i class="dom-dot" style="background:${domainColor(k)}"></i>${esc(k)}</label>`).join('')
+          : '<small>доменов нет</small>'}</span>
+        <span class="rt"><input type="number" id="tm-rate-${id}" data-k="rate" min="0" step="1" value="${m.rate > 0 ? m.rate : ''}" placeholder="${F.rateOf(n, Object.assign({}, m, { rate: 0 }))}" aria-label="Ставка в час" title="${ag ? 'Цена часа работы агента' : 'Цена часа рабочего времени'}. Пусто — ${ag ? 'ставка агента по умолчанию' : 'ставка роли'}">${esc(cfg.currency || '$')}/ч</span>
+        <span class="sp">${ag ? `×<input type="number" id="tm-speed-${id}" data-k="speed" min="0.1" step="0.5" value="${m.speed || 5}" aria-label="Во сколько раз агент быстрее">` : ''}</span>
+        <button class="icon-btn del" type="button" data-act="del" title="Убрать из команды" aria-label="Убрать из команды">✕</button>
       </div>`;
     }).join('');
   }
 
-  function onStageInput(e) {
-    const el = e.target, card = el.closest('[data-stage]');
-    if (!card || !el.dataset.k) return;
-    const s = cfg.stages[+card.dataset.stage];
-    const k = el.dataset.k;
-    const val = el.type === 'number' ? parseFloat(el.value) : el.type === 'checkbox' ? el.checked : el.value;
-    if (el.type === 'number' && !Number.isFinite(val)) return;
-    if (k.startsWith('rw.')) {
-      const f = k.slice(3);
-      if (f === 'to') {
-        s.rework = val ? Object.assign({ p: 20, pAgent: 25 }, s.rework || {}, { to: val }) : null;
-        renderStages();
-      } else if (s.rework) s.rework[f] = val;
-    } else if (k.startsWith('ag.')) {
-      s.agent = s.agent || { on: false, speed: 10, count: 2, oversight: 1, oversightPool: s.pool };
-      s.agent[k.slice(3)] = val;
-      if (k === 'ag.on') card.querySelector('.agent').dataset.on = String(val);
-    } else s[k] = val;
-    changed(k === 'name');
-  }
-
-  function onStageClick(e) {
-    const b = e.target.closest('[data-act]'), card = e.target.closest('[data-stage]');
-    if (!b || !card) return;
-    const i = +card.dataset.stage, st = cfg.stages;
-    if (b.dataset.act === 'up' && i > 0) [st[i - 1], st[i]] = [st[i], st[i - 1]];
-    if (b.dataset.act === 'down' && i < st.length - 1) [st[i + 1], st[i]] = [st[i], st[i + 1]];
-    if (b.dataset.act === 'del' && st.length > 1) st.splice(i, 1);
-    // Возврат допустим только на более ранний этап.
-    st.forEach((s, j) => { if (s.rework && st.findIndex(x => x.id === s.rework.to) >= j) s.rework = null; if (j === 0) s.rework = null; });
-    renderStages();
-    changed(true);
-  }
-
-  function onPoolInput(e) {
-    const el = e.target, row = el.closest('[data-pool]');
-    if (!row || !el.dataset.k) return;
-    const p = cfg.pools[+row.dataset.pool];
-    if (el.dataset.k === 'count') { const v = parseInt(el.value, 10); if (!Number.isFinite(v)) return; p.count = Math.max(0, v); }
-    else p.name = el.value;
-    if (el.dataset.k === 'name') renderStages();
-    changed(true);
-  }
-
-  function onPoolClick(e) {
-    const b = e.target.closest('[data-act=del]'), row = e.target.closest('[data-pool]');
-    if (!b || !row || cfg.pools.length < 2) return;
-    const [gone] = cfg.pools.splice(+row.dataset.pool, 1);
-    const fallback = cfg.pools[0].id;
-    cfg.stages.forEach(s => {
-      if (s.pool === gone.id) s.pool = fallback;
-      if (s.agent && s.agent.oversightPool === gone.id) s.agent.oversightPool = fallback;
-    });
-    renderPools(); renderStages();
-    changed(true);
-  }
-
-  let timer = null;
-  function changed(immediateLabels) {
-    save();
-    $('#json').value = JSON.stringify(cfg, null, 2);
-    clearTimeout(timer);
-    timer = setTimeout(run, immediateLabels ? 50 : 200);
-  }
-
-  // ---------- Прогон ----------
-  function run() {
-    const t0 = performance.now();
-    const A = S.simulate(cfg, 'A'), B = S.simulate(cfg, 'B');
-    const thA = S.analyze(cfg, 'A'), thB = S.analyze(cfg, 'B');
-    out = { A, B, thA, thB, ms: performance.now() - t0 };
-    const maxF = A.frames.length - 1;
-    $('#scrub').max = maxF;
-    if (frame > maxF) frame = maxF;
-    renderVerdict();
-    renderBoards();
-    renderCharts();
-    renderUtil();
-    renderStageTable();
-    setFrame(frame);
-  }
-
-  function poolLabel(th, key) { const p = th.pools.find(x => x.key === key); return p ? p.label : '—'; }
-  function weeksDays(h) { return h == null ? '—' : fmt(h / 24, 1) + ' дн'; }
-
-  function renderVerdict() {
-    const { A, B, thA, thB } = out;
-    const ratio = thB.maxTp / thA.maxTp;
-    const flow = A.mode === 'flow';
-    const over = th => th.pools.filter(p => p.rho != null && p.rho >= 1);
-    const alerts = [];
-    [['A', thA], ['B', thB]].forEach(([w, th]) => {
-      const o = over(th);
-      if (o.length) alerts.push(`<div class="alert"><strong>Сценарий ${w} перегружен.</strong> ${o.map(p => esc(p.label) + ' — ' + pct(p.rho)).join(', ')} от доступного времени. Очередь растёт без предела, сроки ниже не стабилизируются: уменьшите поток или добавьте людей.</div>`);
-    });
-    const moved = thA.bottleneck !== thB.bottleneck;
-    const bnA = poolLabel(thA, thA.bottleneck), bnB = poolLabel(thB, thB.bottleneck);
-    const pB = thB.pools.find(p => p.key === thB.bottleneck);
-    const relieved = thB.pools.filter(p => !p.agent).map(p => ({ p, a: thA.pools.find(x => x.key === p.key) }))
-      .filter(x => x.a && x.a.rho != null && x.a.rho - x.p.rho > 0.2);
-
-    const kpi = [
-      flow ? ['Поступает задач в неделю', A.perWeek, B.perWeek, 1, 0] : ['Задач в бэклоге', A.backlog, B.backlog, 0, 0],
-      ['Выполнено задач в неделю', A.throughput, B.throughput, 1, 1],
-      ['Предел системы, задач в неделю', thA.maxTp, thB.maxTp, 1, 1],
-      ['Срок задачи, медиана, дн', A.leadP50 / 24, B.leadP50 / 24, 1, -1],
-      ['Срок задачи, 85-й перцентиль, дн', A.leadP85 / 24, B.leadP85 / 24, 1, -1],
-      ['Задач в работе одновременно', A.wipAvg, B.wipAvg, 1, -1],
-      ['Эффективность потока (работа / срок)', A.flowEff * 100, B.flowEff * 100, 0, 1, '%'],
-      ['Возвратов на задачу', A.reworksPerTask, B.reworksPerTask, 2, -1],
-    ];
-    if (!flow) kpi.splice(1, 0, ['Бэклог разобран за, дн', A.drainT == null ? NaN : A.drainT / 24, B.drainT == null ? NaN : B.drainT / 24, 1, -1]);
-    const delta = (a, b, d, dir, unit) => {
-      if (!Number.isFinite(a) || !Number.isFinite(b) || dir === 0) return '<td class="num delta flat"></td>';
-      const diff = b - a;
-      if (Math.abs(diff) < Math.pow(10, -d) / 2 || Math.abs(diff) / Math.max(Math.abs(a), 1e-9) < 0.02) return '<td class="num delta flat">≈</td>';
-      const good = diff * dir > 0;
-      const rel = a !== 0 && !unit ? ` (×${fmt(b / a, 2)})` : '';
-      return `<td class="num delta ${good ? 'good' : 'bad'}">${diff > 0 ? '▲ +' : '▼ −'}${fmt(Math.abs(diff), d)}${unit || ''}${rel}</td>`;
-    };
-
-    $('#verdict').innerHTML = `
-      <h2>Итог</h2>
-      <div class="verdict">
-        <div>
-          <div class="hero-num">×${fmt(ratio, 2)} <small>к пределу пропускной способности</small></div>
-          <div class="hero-cap">Система без агентов выдержит до <b class="num">${fmt(thA.maxTp, 1)}</b> задач в неделю, с агентами — до <b class="num">${fmt(thB.maxTp, 1)}</b>. Больше упирается в самую загруженную роль.</div>
-        </div>
-        <div class="shift">
-          <p>${moved
-            ? `Узкое место сместилось: <span class="bn-chip">${esc(bnA)}</span> → <span class="bn-chip">${esc(bnB)}</span>`
-            : `Узкое место не изменилось: <span class="bn-chip">${esc(bnA)}</span>`}</p>
-          ${pB ? `<p>В B на одну задачу приходится <b class="num">${fmt(pB.load, 1)} ч</b> работы роли «${esc(pB.label)}»${pB.agent ? '' : ` (${pB.count} чел.)`}. Чтобы поднять предел, разгружайте именно её: больше людей, агент на этом этапе, меньше возвратов.</p>` : ''}
-          ${relieved.length ? `<p>Освободилось время: ${relieved.map(x => `${esc(x.p.label)} ${pct(x.a.rho)} → ${pct(x.p.rho)}`).join(', ')}.</p>` : ''}
-        </div>
-      </div>
-      ${alerts.join('')}
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Метрика</th><th><span class="tag a">A · люди</span></th><th><span class="tag b">B · с агентами</span></th><th>Разница</th></tr></thead>
-          <tbody>${kpi.map(([name, a, b, d, dir, unit]) => `<tr><td>${name}</td><td class="num">${fmt(a, d)}${unit || ''}</td><td class="num">${fmt(b, d)}${unit || ''}</td>${delta(a, b, d, dir, unit)}</tr>`).join('')}</tbody>
-        </table>
-      </div>
-      <p class="hint">Срок задачи — календарные дни от появления до «Готово». Метрики за ${fmt((A.T - A.W0) / 168, 0)} нед. после разогрева, прогон ${fmt(out.ms, 0)} мс.</p>`;
-  }
-
-  // ---------- Доска ----------
-  function renderBoards() {
-    const n = cfg.stages.length;
-    const row = (w, r, th) => `
-      <div>
-        <div class="board-label"><span class="tag ${w.toLowerCase()}">${w === 'A' ? 'A · люди' : 'B · с агентами'}</span></div>
-        <div class="board-scroll">
-          <div class="board" style="--cols:${n + 1}" data-board="${w}">
-            ${r.stages.map((s, i) => {
-              const st = cfg.stages[i];
-              const who = s.agentOn ? `агенты ×${st.agent.speed} · проверка: ${poolName(st.agent.oversightPool)}` : poolName(st.pool);
-              return `<div class="col${th.bottleneckStages[i] ? ' bn' : ''}">
-                <div class="col-h"><b>${esc(s.name)}</b><span>${esc(who)}</span></div>
-                <div class="lane"><div class="lane-l">ждут <span class="num" data-n="w${i}"></span></div><div class="dots" data-d="w${i}"></div></div>
-                <div class="lane"><div class="lane-l">в работе <span class="num" data-n="k${i}"></span></div><div class="dots" data-d="k${i}"></div></div>
-              </div>`;
-            }).join('')}
-            <div class="col"><div class="col-h"><b>Готово</b><span>с начала</span></div><div class="done-n num" data-n="done"></div></div>
-          </div>
-        </div>
+  let openCreates = -1; // у какой роли раскрыт список «Заводит», чтобы не закрывать его при перерисовке
+  function renderRoles() {
+    const nr = F.normalize(cfg).roles;
+    $('#roles').innerHTML = cfg.roles.map((r, i) => {
+      const cr = (nr[i] || {}).creates || [], all = cr === 'all';
+      const names = all ? 'все типы' : cr.length ? cfg.types.filter(t => cr.includes(t.id)).map(t => t.name).join(', ') : 'ничего';
+      const mine = cfg.team.filter(m => m.role === r.id), on = mine.filter(m => m.active !== false);
+      const h = on.filter(m => m.kind !== 'agent').length, a = on.filter(m => m.kind === 'agent').length, offN = mine.length - on.length;
+      const who = ([h ? `${h} чел.` : '', a ? `${a} ИИ` : ''].filter(Boolean).join(' + ') || 'никого') + (offN ? ` · выкл. ${offN}` : '');
+      return `<div class="r-row" data-role="${i}">
+        <span class="sw" style="background:${roleColor(r.id)}"></span>
+        <input type="text" id="role-name-${esc(r.id)}" data-k="name" value="${esc(r.name)}" aria-label="Название роли">
+        <span class="r-rate" title="Ставка роли в час: участники берут её, если своя не задана. Пусто — ориентир по названию роли"><input type="number" id="role-rate-${esc(r.id)}" data-k="rate" min="0" step="1" value="${r.rate > 0 ? r.rate : ''}" placeholder="${F.refRate(r.name)}" aria-label="Ставка роли в час">${esc(cfg.currency || '$')}/ч</span>
+        <small>${who}</small>
+        <button class="icon-btn" type="button" data-act="del" title="Удалить роль" aria-label="Удалить роль"${cfg.roles.length < 2 ? ' disabled' : ''}>✕</button>
+        <details class="cr" data-cr="${i}"${openCreates === i ? ' open' : ''}><summary title="Какие типы задач роль заводит">Заводит задачи: <b>${esc(names)}</b></summary>
+          <div class="cr-list"><label class="all"><input type="checkbox" id="role-cr-all-${esc(r.id)}" data-k="cr-all"${all ? ' checked' : ''}>все типы</label>
+          ${cfg.types.map((t, j) => `<label><input type="checkbox" id="role-cr-${esc(r.id)}-${esc(t.id)}" data-k="cr:${esc(t.id)}"${all || cr.includes(t.id) ? ' checked' : ''}${all ? ' disabled' : ''}><i style="background:${typeColor(t, cfg.types)}"></i>${esc(t.name)}</label>`).join('')}</div>
+        </details>
       </div>`;
-    $('#boards').innerHTML = row('A', out.A, out.thA) + row('B', out.B, out.thB);
-  }
-  function poolName(id) { const p = cfg.pools.find(x => x.id === id); return p ? p.name : '—'; }
-
-  const MAX_DOTS = 36;
-  function dotsHtml(count, cls, color) {
-    const shown = Math.min(count, MAX_DOTS);
-    let h = '';
-    for (let i = 0; i < shown; i++) h += cls === 'w' ? '<i class="dot w"></i>' : `<i class="dot" style="background:${color}"></i>`;
-    if (count > shown) h += `<span class="more">+${count - shown}</span>`;
-    return h;
+    }).join('');
   }
 
-  function paintBoard(w, r) {
-    const f = r.frames[Math.min(frame, r.frames.length - 1)];
-    const el = document.querySelector(`[data-board="${w}"]`);
-    if (!el || !f) return;
-    f.w.forEach((c, i) => {
-      el.querySelector(`[data-n="w${i}"]`).textContent = c;
-      el.querySelector(`[data-n="k${i}"]`).textContent = f.k[i];
-      el.querySelector(`[data-d="w${i}"]`).innerHTML = dotsHtml(c, 'w');
-      el.querySelector(`[data-d="k${i}"]`).innerHTML = dotsHtml(f.k[i], 'k', stageColor(i));
-    });
-    el.querySelector('[data-n="done"]').textContent = f.done;
+  function renderDomains() {
+    const ds = domainList();
+    $('#domains').innerHTML = ds.length ? ds.map((d, i) => {
+      const who = cfg.team.filter(m => m.active !== false && (!Array.isArray(m.domains) || m.domains.includes(d))).length, types = cfg.types.filter(t => t.domain === d).length;
+      return `<div class="r-row" data-domain="${i}">
+        <span class="sw" style="background:${domainColor(d)}"></span>
+        <input type="text" id="dom-name-${i}" data-k="name" value="${esc(d)}" aria-label="Название домена">
+        <small>${who} уч. · ${types} тип.</small>
+        <button class="icon-btn" type="button" data-act="del" title="Удалить домен" aria-label="Удалить домен">✕</button>
+      </div>`;
+    }).join('') : '<p class="hint">Доменов нет: все участники берут любые задачи.</p>';
   }
 
-  const DOW = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
-  function clockLabel(t) {
-    const d = t + 9; // рабочий день модели начинается в 9:00
-    const day = Math.floor(d / 24), hh = Math.floor(d % 24);
-    return `нед. ${Math.floor(day / 7) + 1} · ${DOW[day % 7]} ${String(hh).padStart(2, '0')}:00`;
+  function renderStages() {
+    const n = cfg.stages.length;
+    $('#stages').innerHTML = `<div class="s-row head"><span></span><span></span><span>Этап</span><span>Кто делает</span><span>WIP-лимит · баги</span><span></span></div>` + cfg.stages.map((s, i) => {
+      const id = esc(s.id), q = !s.role;
+      return `<div class="s-row" data-stage="${i}">
+        <span class="grip" draggable="true" title="Перетащите, чтобы поменять порядок" aria-hidden="true">⠿</span>
+        <span class="sw" style="background:${roleColor(s.role)}"></span>
+        <input class="nm" type="text" id="st-name-${id}" data-k="name" value="${esc(s.name)}" aria-label="Название этапа">
+        <select id="st-role-${id}" data-k="role" aria-label="Кто делает">
+          ${roleOptions(s.role)}
+          ${i > 0 ? `<option value=""${q ? ' selected' : ''}>— очередь</option>` : ''}
+        </select>
+        ${q ? `<input class="nu" type="number" id="st-num-${id}" data-k="limit" min="0" step="1" value="${s.limit || 0}" aria-label="WIP-лимит очереди, 0 — без лимита" title="WIP-лимит очереди: сколько задач в ней может быть, 0 — без лимита">`
+          : `<label class="bg" title="На этом этапе находят баги у задач"><input type="checkbox" id="st-bugs-${id}" data-k="bugs"${s.bugs ? ' checked' : ''}>находит баги</label>`}
+        <span class="act">
+          <button class="icon-btn" type="button" data-act="up" title="Выше" aria-label="Выше"${i === 0 ? ' disabled' : ''}>↑</button>
+          <button class="icon-btn" type="button" data-act="down" title="Ниже" aria-label="Ниже"${i === n - 1 ? ' disabled' : ''}>↓</button>
+          <button class="icon-btn" type="button" data-act="del" title="Удалить этап" aria-label="Удалить этап"${n < 2 ? ' disabled' : ''}>✕</button>
+        </span>
+      </div>`;
+    }).join('');
   }
 
-  function setFrame(i) {
-    if (!out) return;
-    frame = Math.max(0, Math.min(i, out.A.frames.length - 1));
-    $('#scrub').value = frame;
-    const t = out.A.frames[frame].t;
-    $('#clock').textContent = clockLabel(t);
-    paintBoard('A', out.A);
-    paintBoard('B', out.B);
-    document.querySelectorAll('.cursor').forEach(l => {
-      const x = +l.dataset.x0 + (t / out.A.T) * +l.dataset.w;
-      l.setAttribute('x1', x); l.setAttribute('x2', x);
-    });
+  function renderTypes() {
+    const S = cfg.stages.filter(s => s.role), total = cfg.types.reduce((a, t) => a + (+t.weight || 0), 0) || 1;
+    const n = cfg.types.length;
+    $('#types').innerHTML = `<table class="types"><thead><tr><th></th><th title="Цвет полоски на карточке задачи">Цвет</th><th>Тип</th><th>Доля</th><th></th><th title="Оценка задачи в Story Points">SP</th><th title="Кто может делать: только участники с этим доменом">Домен</th><th title="Могут ли ИИ-агенты брать задачи этого типа">ИИ-агенты</th><th title="У какой доли задач этого типа на тестировании найдут баг (задачу типа Bug)">Баги, %</th>
+      ${S.map(s => `<th><span class="sw" style="background:${roleColor(s.role)}"></span>${esc(s.name)}, ч</th>`).join('')}<th></th></tr></thead>
+      <tbody>${cfg.types.map((t, i) => `<tr data-type="${i}">
+        <td><span class="grip" draggable="true" title="Перетащите, чтобы поменять порядок" aria-hidden="true">⠿</span></td>
+        <td><input type="color" class="tp-color" id="tp-color-${esc(t.id)}" data-k="color" value="${typeColor(t, cfg.types)}" aria-label="${esc(t.name)}: цвет" title="Цвет полоски на карточке задачи"></td>
+        <td><input type="text" id="tp-name-${esc(t.id)}" data-k="name" value="${esc(t.name)}" aria-label="Название типа"></td>
+        <td><input type="number" id="tp-w-${esc(t.id)}" data-k="weight" min="0" step="1" value="${t.weight}" aria-label="Доля"></td>
+        <td class="pct">${Math.round((+t.weight || 0) / total * 100)}%</td>
+        <td><input type="number" id="tp-sp-${esc(t.id)}" data-k="sp" min="0" step="1" value="${t.sp != null ? t.sp : 1}" aria-label="${esc(t.name)}: Story Points"></td>
+        <td><select id="tp-dom-${esc(t.id)}" data-k="domain" aria-label="${esc(t.name)}: домен"><option value="">${t.id === F.BUG_ID ? 'как у задачи' : 'любой'}</option>${domainList().map(k => `<option value="${esc(k)}"${t.domain === k ? ' selected' : ''}>${esc(k)}</option>`).join('')}</select></td>
+        <td><label class="ag-ok"><input type="checkbox" id="tp-ai-${esc(t.id)}" data-k="agents"${t.agents !== false ? ' checked' : ''} aria-label="ИИ-агенты могут делать ${esc(t.name)}">можно</label></td>
+        <td><input type="number" id="tp-bc-${esc(t.id)}" data-k="bugChance" min="0" max="95" step="5" value="${t.bugChance || 0}" aria-label="${esc(t.name)}: доля задач с багом, %"></td>
+        ${S.map(s => `<td><input type="number" id="tp-h-${esc(t.id)}-${esc(s.id)}" data-k="h:${esc(s.id)}" min="0" step="0.5" value="${t.hours && t.hours[s.id] != null ? t.hours[s.id] : 1}" aria-label="${esc(t.name)}: ${esc(s.name)}, часов"></td>`).join('')}
+        <td class="act">
+          <button class="icon-btn" type="button" data-act="up" title="Выше" aria-label="Выше"${i === 0 ? ' disabled' : ''}>↑</button>
+          <button class="icon-btn" type="button" data-act="down" title="Ниже" aria-label="Ниже"${i === n - 1 ? ' disabled' : ''}>↓</button>
+          <button class="icon-btn" type="button" data-act="del" title="${t.id === F.BUG_ID ? 'Bug — обязательный тип, все найденные баги этого типа' : 'Удалить тип'}" aria-label="Удалить тип"${n < 2 || t.id === F.BUG_ID ? ' disabled' : ''}>✕</button>
+        </td>
+      </tr>`).join('')}</tbody></table>`;
   }
 
-  function loop(ts) {
-    if (!playing) return;
-    const fps = +$('#speed').value; // кадр = 4 часа модели
-    if (!lastTs) lastTs = ts;
-    const adv = Math.floor((ts - lastTs) / 1000 * fps);
-    if (adv > 0) {
-      lastTs += adv * 1000 / fps;
-      if (frame + adv >= out.A.frames.length - 1) { setFrame(out.A.frames.length - 1); togglePlay(false); return; }
-      setFrame(frame + adv);
-    }
-    requestAnimationFrame(loop);
+  // Скорость анимации хранится в пресете: при загрузке пресета и после перезагрузки страницы она та же.
+  function syncSpeed() {
+    const sel = $('#speed'), v = String(cfg.speed || 4);
+    sel.value = [...sel.options].some(o => o.value === v) ? v : '4';
   }
-  function togglePlay(on) {
-    playing = on == null ? !playing : on;
-    $('#play').textContent = playing ? '❚❚ Пауза' : '▶ Пуск';
-    if (playing) {
-      if (frame >= out.A.frames.length - 1) setFrame(0);
-      lastTs = 0; requestAnimationFrame(loop);
-    }
+  function renderEditor() { renderTeam(); renderRoles(); renderDomains(); renderStages(); renderTypes(); syncSpeed(); }
+
+  // Первый этап — источник задач, ему нужен исполнитель.
+  function fixFirst() { const s = cfg.stages[0]; if (s && !s.role) s.role = cfg.roles[0].id; }
+
+  function insertStage(pos) {
+    const prev = cfg.stages[pos - 1];
+    const s = { id: uid('s'), name: 'Новый этап', role: (prev && prev.role) || cfg.roles[0].id };
+    cfg.stages.splice(pos, 0, s);
+    cfg.types.forEach(t => { t.hours = t.hours || {}; t.hours[s.id] = 1; });
+    fresh = s.id;
+    renderStages(); renderTypes();
+    changed();
+    focusRow(`#stages [data-stage="${pos}"]`, true);
+  }
+  // field — какое поле строки получит фокус (по умолчанию название).
+  function focusRow(sel, select, field) {
+    const row = document.querySelector(sel);
+    if (!row) return;
+    row.scrollIntoView({ block: 'nearest', behavior: reduceMotion() ? 'auto' : 'smooth' });
+    row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash');
+    const inp = (field && row.querySelector(`[data-k="${field}"]`)) || row.querySelector('[data-k="name"]');
+    inp.focus({ preventScroll: true });
+    if (select) inp.select();
   }
 
-  // ---------- Графики ----------
-  const CW = 560, CH = 230, M = { l: 38, r: 12, t: 10, b: 26 };
-  function niceMax(v) {
-    if (v <= 0) return 1;
-    const p = Math.pow(10, Math.floor(Math.log10(v))), m = v / p;
-    return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p;
-  }
-  function seriesOf(r) {
-    // Снизу вверх: (Готово), последний этап, ..., первый этап.
-    const n = r.stages.length;
-    return r.frames.map(f => {
-      const vals = [];
-      if (view === 'cfd') vals.push(f.done);
-      for (let i = n - 1; i >= 0; i--) vals.push(f.w[i] + f.k[i]);
-      return vals;
-    });
-  }
-  function bandColors(n) {
-    const c = [];
-    if (view === 'cfd') c.push('var(--done)');
-    for (let i = n - 1; i >= 0; i--) c.push(stageColor(i));
-    return c;
-  }
-  function bandNames(r) {
-    const c = [];
-    if (view === 'cfd') c.push('Готово');
-    for (let i = r.stages.length - 1; i >= 0; i--) c.push(r.stages[i].name);
-    return c;
-  }
-
-  function chartSvg(r, yMax) {
-    const pw = CW - M.l - M.r, ph = CH - M.t - M.b;
-    const T = r.T;
-    const X = t => M.l + (t / T) * pw, Y = v => M.t + ph - (v / yMax) * ph;
-    const series = seriesOf(r), colors = bandColors(r.stages.length);
-    const k = series[0] ? series[0].length : 0;
-    let paths = '';
-    const prev = r.frames.map(() => 0);
-    for (let b = 0; b < k; b++) {
-      const top = r.frames.map((f, i) => prev[i] + series[i][b]);
-      let d = '';
-      r.frames.forEach((f, i) => { d += (i ? 'L' : 'M') + X(f.t).toFixed(1) + ',' + Y(top[i]).toFixed(1); });
-      for (let i = r.frames.length - 1; i >= 0; i--) d += 'L' + X(r.frames[i].t).toFixed(1) + ',' + Y(prev[i]).toFixed(1);
-      paths += `<path d="${d}Z" fill="${colors[b]}" fill-opacity="${view === 'cfd' && b === 0 ? 1 : 0.85}" stroke="var(--surface)" stroke-width="0.6"/>`;
-      top.forEach((v, i) => { prev[i] = v; });
-    }
-    let ax = '';
-    const ticks = yMax % 5 === 0 ? 5 : 4;
-    for (let j = 0; j <= ticks; j++) {
-      const v = (yMax / ticks) * j, y = Y(v);
-      ax += `<line x1="${M.l}" x2="${CW - M.r}" y1="${y}" y2="${y}"${j === 0 ? ' class="base"' : ''}/><text x="${M.l - 6}" y="${y + 3.5}" text-anchor="end">${Math.round(v)}</text>`;
-    }
-    const weeks = T / 168, step = weeks <= 12 ? 2 : weeks <= 30 ? 4 : weeks <= 60 ? 8 : 13;
-    for (let w = 0; w <= weeks; w += step) ax += `<text x="${X(w * 168)}" y="${CH - 8}" text-anchor="middle">${w} нед</text>`;
-    if (r.W0 > 0) ax += `<line x1="${X(r.W0)}" x2="${X(r.W0)}" y1="${M.t}" y2="${M.t + ph}" stroke-dasharray="0" style="stroke:var(--axis)"/><text x="${X(r.W0) + 4}" y="${M.t + 10}" text-anchor="start">разогрев</text>`;
-    return `<svg viewBox="0 0 ${CW} ${CH}" role="img" aria-label="Задачи на этапах во времени, сценарий ${r.which}">
-      <g class="ax">${ax}</g>${paths}
-      <line class="cursor" data-x0="${M.l}" data-w="${pw}" x1="${M.l}" x2="${M.l}" y1="${M.t}" y2="${M.t + ph}" stroke="var(--ink)" stroke-width="1.5"/>
-      <line class="hover" x1="0" x2="0" y1="${M.t}" y2="${M.t + ph}" stroke="var(--ink-2)" stroke-width="1" visibility="hidden"/>
-    </svg>`;
-  }
-
-  function renderCharts() {
-    $('#view-wip').setAttribute('aria-pressed', view === 'wip');
-    $('#view-cfd').setAttribute('aria-pressed', view === 'cfd');
-    const names = bandNames(out.A), colors = bandColors(out.A.stages.length);
-    $('#legend').innerHTML = names.map((nm, i) => ({ nm, c: colors[i] })).reverse().map(x => `<span><i style="background:${x.c}"></i>${esc(x.nm)}</span>`).join('');
-    const tot = r => Math.max(...seriesOf(r).map(v => v.reduce((a, b) => a + b, 0)));
-    const yMax = niceMax(Math.max(tot(out.A), tot(out.B), 4));
-    $('#charts').innerHTML = ['A', 'B'].map(w => `
-      <div class="chart" data-chart="${w}">
-        <div class="chart-title"><span class="tag ${w.toLowerCase()}">${w === 'A' ? 'A · люди' : 'B · с агентами'}</span></div>
-        ${chartSvg(out[w], yMax)}
-        <div class="tip" hidden></div>
-      </div>`).join('');
-    document.querySelectorAll('[data-chart]').forEach(box => {
-      const r = out[box.dataset.chart], svg = box.querySelector('svg'), tip = box.querySelector('.tip'), hover = box.querySelector('.hover');
-      const frameAt = ev => {
-        const rect = svg.getBoundingClientRect();
-        const x = (ev.clientX - rect.left) / rect.width * CW;
-        const t = (x - M.l) / (CW - M.l - M.r) * r.T;
-        return Math.max(0, Math.min(r.frames.length - 1, Math.round(t / 4)));
-      };
-      svg.addEventListener('mousemove', ev => {
-        const i = frameAt(ev), f = r.frames[i];
-        const x = M.l + (f.t / r.T) * (CW - M.l - M.r);
-        hover.setAttribute('x1', x); hover.setAttribute('x2', x); hover.setAttribute('visibility', 'visible');
-        const rows = r.stages.map((s, j) => ({ name: s.name, v: f.w[j] + f.k[j], q: f.w[j], c: stageColor(j) }));
-        tip.innerHTML = `<div><b>${clockLabel(f.t)}</b></div>` + rows.map(x => `<div><span><i class="dot" style="display:inline-block;background:${x.c};margin-right:5px"></i>${esc(x.name)}</span><span class="num">${x.v}${x.q ? ` (ждут ${x.q})` : ''}</span></div>`).join('') + `<div><span>Готово</span><span class="num">${f.done}</span></div>`;
-        tip.hidden = false;
-        const br = box.getBoundingClientRect();
-        let left = ev.clientX - br.left + 14;
-        if (left + tip.offsetWidth > br.width) left = ev.clientX - br.left - tip.offsetWidth - 14;
-        tip.style.left = Math.max(0, left) + 'px';
-        tip.style.top = Math.max(0, ev.clientY - br.top - 20) + 'px';
-      });
-      svg.addEventListener('mouseleave', () => { tip.hidden = true; hover.setAttribute('visibility', 'hidden'); });
-      svg.addEventListener('click', ev => setFrame(frameAt(ev)));
-    });
-  }
-
-  // ---------- Загрузка ролей ----------
-  function renderUtil() {
-    const { A, B, thA, thB } = out;
-    const keys = [];
-    thA.pools.concat(thB.pools).forEach(p => { if (!keys.includes(p.key)) keys.push(p.key); });
-    const rows = keys.map(key => {
-      const a = A.pools.find(p => p.key === key), b = B.pools.find(p => p.key === key);
-      const ta = thA.pools.find(p => p.key === key), tb = thB.pools.find(p => p.key === key);
-      const label = (ta || tb).label, meta = (ta || tb).agent ? `${(ta || tb).count} агент.` : `${(ta || tb).count} чел.`;
-      return { key, label, meta, a: a && ta ? a.util : null, b: b && tb ? b.util : null, rhoA: ta && ta.rho, rhoB: tb && tb.rho };
-    });
-    const maxV = Math.max(1, ...rows.flatMap(r => [r.a, r.b].filter(Number.isFinite)));
-    const scale = Math.min(maxV, 1.5);
-    const bar = (v, cls, rho) => {
-      if (v == null) return `<div class="u-bar"><span class="u-val">—</span></div>`;
-      const w = Math.min(v, 1.5) / scale * 85;
-      const over = rho != null && rho >= 1 ? ' · перегруз' : '';
-      return `<div class="u-bar"><div class="u-fill ${cls}" style="width:${w}%"></div><span class="u-val">${pct(v)}${over}</span></div>`;
-    };
-    $('#util').innerHTML = rows.map(r => `
-      <div class="u-row">
-        <div class="u-name">${esc(r.label)}<small>${r.meta}${r.key === thA.bottleneck || r.key === thB.bottleneck ? ` · <span class="bn-chip">узкое место${r.key === thA.bottleneck && r.key === thB.bottleneck ? '' : r.key === thA.bottleneck ? ' A' : ' B'}</span>` : ''}</small></div>
-        <div class="u-bars"><div class="u-track"><span class="u-100" style="left:${1 / scale * 85}%"></span>${bar(r.a, 'a', r.rhoA)}${bar(r.b, 'b', r.rhoB)}</div></div>
-      </div>`).join('');
-  }
-
-  // ---------- Таблица этапов ----------
-  function renderStageTable() {
-    const { A, B } = out;
-    const c = (a, b, d, u) => `<td class="num">${fmt(a, d)}${u}</td><td class="num">${fmt(b, d)}${u}</td>`;
-    $('#stageTable').innerHTML = `<table>
-      <thead>
-        <tr><th rowspan="2">Этап</th><th colspan="2">Очередь, задач</th><th colspan="2">Ожидание</th><th colspan="2">Работа, ч</th><th colspan="2">Проходов на задачу</th></tr>
-        <tr><th>A</th><th>B</th><th>A</th><th>B</th><th>A</th><th>B</th><th>A</th><th>B</th></tr>
-      </thead>
-      <tbody>${A.stages.map((s, i) => {
-        const b = B.stages[i];
-        return `<tr><td><i class="dot" style="display:inline-block;background:${stageColor(i)};margin-right:6px"></i>${esc(s.name)}${b.agentOn ? ' <small class="hint">· B: агент</small>' : ''}</td>
-          ${c(s.avgQueue, b.avgQueue, 1, '')}${c(s.avgWait / 24, b.avgWait / 24, 1, ' дн')}${c(s.avgTouch, b.avgTouch, 1, '')}${c(s.visits, b.visits, 2, '')}</tr>`;
-      }).join('')}</tbody></table>
-      <p class="hint">Ожидание — календарные дни в очереди этапа за один проход. Работа — рабочие часы исполнителя за проход, для агента уже с учётом ускорения.</p>`;
-  }
-
-  // ---------- События ----------
-  scalarIds.forEach(id => $('#' + id).addEventListener('input', e => {
+  // Команда
+  $('#currency').addEventListener('input', e => { cfg.currency = e.target.value.trim().slice(0, 4) || '$'; renderTeam(); renderRoles(); changed(); });
+  $('#agentRate').addEventListener('input', e => { const v = parseFloat(e.target.value); if (!Number.isFinite(v) || v < 0) return; cfg.agentRate = v; renderTeam(); changed(); });
+  ['humanHours', 'agentHours', 'humanDays', 'agentDays'].forEach(id => $('#' + id).addEventListener('input', e => {
     const v = parseFloat(e.target.value);
     if (!Number.isFinite(v)) return;
-    setScalar(id, v);
+    cfg[id] = id.endsWith('Days') ? Math.min(7, Math.max(1, Math.round(v))) : Math.min(24, Math.max(1, v));
     changed();
   }));
-  ['agents247', 'downstreamFirst'].forEach(id => $('#' + id).addEventListener('change', e => { cfg[id] = e.target.checked; changed(); }));
-  document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => {
-    cfg.arrival.mode = b.dataset.mode; renderControls(); changed(true);
-  }));
-  $('#stages').addEventListener('input', onStageInput);
-  $('#stages').addEventListener('change', e => { if (e.target.tagName === 'SELECT' || e.target.type === 'checkbox') onStageInput(e); });
-  $('#stages').addEventListener('click', onStageClick);
-  $('#pools').addEventListener('input', onPoolInput);
-  $('#pools').addEventListener('click', onPoolClick);
-  $('#addPool').addEventListener('click', () => { cfg.pools.push({ id: uid('r'), name: 'Новая роль', count: 1 }); renderPools(); renderStages(); changed(true); });
-  $('#addStage').addEventListener('click', () => {
-    const pool = cfg.pools[0].id;
-    cfg.stages.push({ id: uid('s'), name: 'Новый этап', pool, min: 1, mode: 2, max: 4, rework: null, agent: { on: false, speed: 5, count: 2, oversight: 0.5, oversightPool: pool } });
-    renderStages(); changed(true);
+  function onTeamEdit(e) {
+    const el = e.target, row = el.closest('[data-member]');
+    if (!row || !el.dataset.k) return;
+    const m = cfg.team[+row.dataset.member], k = el.dataset.k;
+    if (k === 'name') { m.name = el.value; renamed(); const av = row.querySelector('.av-h'), p = F.create(cfg).people.find(x => x.id === m.id); if (av && p) av.textContent = p.label; return; }
+    if (k === 'speed') { const v = parseFloat(el.value); if (!Number.isFinite(v) || v <= 0) return; m.speed = v; changed(); return; }
+    // Пустое поле или 0 — ставка роли (у агента — ставка агента по умолчанию).
+    if (k === 'rate') { const v = parseFloat(el.value); if (el.value.trim() === '' || v === 0) delete m.rate; else if (Number.isFinite(v) && v > 0) m.rate = v; else return; changed(); return; }
+    // Отключённый остаётся в настройках, но не работает и не входит в расчёт.
+    if (k === 'active') {
+      if (el.checked) delete m.active; else m.active = false;
+      renderTeam(); renderRoles(); renderDomains(); changed(); return;
+    }
+    // «все» — поле domains убирается: участник берёт задачи любых доменов, и будущих тоже.
+    if (k === 'dom-all') {
+      if (el.checked) delete m.domains; else m.domains = domainList().slice();
+      renderTeam(); renderDomains(); changed(); return;
+    }
+    if (k.startsWith('dom:')) {
+      const d = k.slice(4), own = new Set(Array.isArray(m.domains) ? m.domains : domainList());
+      if (el.checked) own.add(d); else own.delete(d);
+      m.domains = domainList().filter(x => own.has(x));
+      renderDomains(); changed(); return;
+    }
+    m[k] = el.value;
+    if (k === 'kind' && m.kind === 'agent' && !m.speed) m.speed = 5;
+    renderTeam(); renderRoles(); changed();
+  }
+  $('#team').addEventListener('input', e => { if (e.target.tagName !== 'SELECT') onTeamEdit(e); });
+  $('#team').addEventListener('change', e => { if (e.target.tagName === 'SELECT') onTeamEdit(e); });
+  $('#team').addEventListener('click', e => {
+    const b = e.target.closest('[data-act=del]'), row = e.target.closest('[data-member]');
+    if (!b || !row) return;
+    cfg.team.splice(+row.dataset.member, 1);
+    renderTeam(); renderRoles(); changed();
   });
-  $('#reseed').addEventListener('click', () => { cfg.seed = 1 + Math.floor(Math.random() * 99999); $('#seed').value = cfg.seed; changed(true); });
-  $('#reset').addEventListener('click', () => { cfg = clone(window.DEVFLOW_EXAMPLE); renderControls(); changed(true); });
-  $('#applyJson').addEventListener('click', () => {
-    const msg = $('#jsonMsg');
-    try {
-      const c = JSON.parse($('#json').value);
-      if (!Array.isArray(c.stages) || !c.stages.length || !Array.isArray(c.pools) || !c.pools.length || !c.arrival) throw new Error('нужны непустые stages и pools и блок arrival');
-      cfg = c; renderControls(); changed(true);
-      msg.className = 'msg'; msg.textContent = 'Применено.';
-    } catch (e) { msg.className = 'msg err'; msg.textContent = 'Не удалось разобрать JSON: ' + e.message; }
-  });
-  $('#copyJson').addEventListener('click', () => {
-    const ta = $('#json'), msg = $('#jsonMsg');
-    navigator.clipboard.writeText(ta.value).then(() => { msg.className = 'msg'; msg.textContent = 'Скопировано.'; })
-      .catch(() => { ta.select(); msg.className = 'msg'; msg.textContent = 'Текст выделен, скопируйте его вручную.'; });
-  });
-  $('#play').addEventListener('click', () => togglePlay());
-  $('#scrub').addEventListener('input', e => { togglePlay(false); setFrame(+e.target.value); });
-  $('#view-wip').addEventListener('click', () => { view = 'wip'; renderCharts(); setFrame(frame); });
-  $('#view-cfd').addEventListener('click', () => { view = 'cfd'; renderCharts(); setFrame(frame); });
+  function addMember(kind) {
+    const role = cfg.roles.find(r => r.id === 'dev') || cfg.roles[0];
+    const same = cfg.team.filter(m => m.role === role.id && m.kind === kind).length + 1;
+    const name = kind === 'agent' ? `ИИ-${role.name.toLowerCase()}${same > 1 ? ' ' + same : ''}` : `${role.name} ${same}`;
+    cfg.team.push(Object.assign({ id: uid('m'), name, role: role.id, kind }, kind === 'agent' ? { speed: 5 } : {})); // ставка — по роли
+    renderTeam(); renderRoles(); changed();
+    focusRow('#team .m-row:last-child', true);
+  }
+  $('#addHuman').addEventListener('click', () => addMember('human'));
+  $('#addAgent').addEventListener('click', () => addMember('agent'));
 
-  renderControls();
-  frame = Math.round((cfg.horizonWeeks * 168 / 4) * 0.5);
-  run();
+  // Роли
+  $('#roles').addEventListener('input', e => {
+    const el = e.target, row = el.closest('[data-role]');
+    if (!row || !el.dataset.k) return;
+    const r = cfg.roles[+row.dataset.role], k = el.dataset.k;
+    // «все типы» — и будущие тоже; иначе явный список id.
+    if (k === 'cr-all' || k.startsWith('cr:')) {
+      const now = F.normalize(cfg).roles[+row.dataset.role].creates;
+      if (k === 'cr-all') r.creates = el.checked ? 'all' : cfg.types.map(t => t.id);
+      else {
+        const set = new Set(now === 'all' ? cfg.types.map(t => t.id) : now), id = k.slice(3);
+        if (el.checked) set.add(id); else set.delete(id);
+        r.creates = cfg.types.map(t => t.id).filter(x => set.has(x));
+      }
+      openCreates = +row.dataset.role;
+      renderRoles(); changed(); return;
+    }
+    if (el.dataset.k === 'rate') {
+      const v = parseFloat(el.value);
+      if (el.value.trim() === '' || v === 0) delete r.rate; else if (Number.isFinite(v) && v > 0) r.rate = v; else return;
+      renderTeam(); changed(); return;
+    }
+    r.name = el.value;
+    renderTeam(); renderStages(); renamed();
+  });
+  $('#roles').addEventListener('toggle', e => { const d = e.target.closest && e.target.closest('[data-cr]'); if (d) openCreates = d.open ? +d.dataset.cr : (openCreates === +d.dataset.cr ? -1 : openCreates); }, true);
+  $('#roles').addEventListener('click', e => {
+    const b = e.target.closest('[data-act=del]'), row = e.target.closest('[data-role]');
+    if (!b || !row || cfg.roles.length < 2) return;
+    const [gone] = cfg.roles.splice(+row.dataset.role, 1);
+    const to = cfg.roles[0].id;
+    cfg.stages.forEach(s => { if (s.role === gone.id) s.role = to; });
+    cfg.team.forEach(m => { if (m.role === gone.id) m.role = to; });
+    renderEditor(); changed();
+  });
+  // Домены: переименование меняет ссылки у участников и типов, удаление их снимает.
+  $('#domains').addEventListener('input', e => {
+    const el = e.target, row = el.closest('[data-domain]');
+    if (!row || el.dataset.k !== 'name') return;
+    const i = +row.dataset.domain, old = cfg.domains[i], name = el.value.trim();
+    if (!name || (name !== old && cfg.domains.includes(name))) return;
+    cfg.domains[i] = name;
+    cfg.team.forEach(m => { if (Array.isArray(m.domains)) m.domains = m.domains.map(d => (d === old ? name : d)); });
+    cfg.types.forEach(t => { if (t.domain === old) t.domain = name; });
+    renderTeam(); renderTypes(); changed();
+  });
+  $('#domains').addEventListener('click', e => {
+    const b = e.target.closest('[data-act=del]'), row = e.target.closest('[data-domain]');
+    if (!b || !row) return;
+    const [gone] = cfg.domains.splice(+row.dataset.domain, 1);
+    cfg.team.forEach(m => { if (Array.isArray(m.domains)) m.domains = m.domains.filter(d => d !== gone); });
+    cfg.types.forEach(t => { if (t.domain === gone) t.domain = null; });
+    renderEditor(); changed();
+  });
+  $('#addDomain').addEventListener('click', () => {
+    cfg.domains = cfg.domains || [];
+    let name = 'Новый домен', k = 2;
+    while (cfg.domains.includes(name)) name = `Новый домен ${k++}`;
+    cfg.domains.push(name);
+    renderEditor(); changed();
+    focusRow('#domains .r-row:last-child', true);
+  });
+  $('#addRole').addEventListener('click', () => {
+    cfg.roles.push({ id: uid('r'), name: 'Новая роль' });
+    renderEditor(); changed();
+    focusRow('#roles .r-row:last-child', true);
+  });
+
+  // Этапы
+  function onStageEdit(e) {
+    const el = e.target, row = el.closest('[data-stage]');
+    if (!row || !el.dataset.k) return;
+    const s = cfg.stages[+row.dataset.stage], k = el.dataset.k;
+    if (k === 'name') { s.name = el.value; renderTypes(); renamed(); return; }
+    if (k === 'bugs') { if (el.checked) s.bugs = true; else delete s.bugs; changed(); return; }
+    if (k === 'role') {
+      if (el.value) s.role = el.value; else { s.role = null; s.limit = s.limit || 0; }
+      renderStages(); renderTypes(); changed(); return;
+    }
+    const v = parseFloat(el.value);
+    if (!Number.isFinite(v)) return;
+    s[k] = Math.max(0, v);
+    changed();
+  }
+  $('#stages').addEventListener('input', e => { if (e.target.tagName !== 'SELECT') onStageEdit(e); });
+  $('#stages').addEventListener('change', e => { if (e.target.tagName === 'SELECT') onStageEdit(e); });
+  $('#stages').addEventListener('click', e => {
+    const b = e.target.closest('[data-act]'), row = e.target.closest('[data-stage]');
+    if (!b || !row) return;
+    const i = +row.dataset.stage, S = cfg.stages;
+    if (b.dataset.act === 'up' && i > 0) [S[i - 1], S[i]] = [S[i], S[i - 1]];
+    if (b.dataset.act === 'down' && i < S.length - 1) [S[i + 1], S[i]] = [S[i], S[i + 1]];
+    if (b.dataset.act === 'del' && S.length > 1) S.splice(i, 1);
+    fixFirst();
+    renderStages(); renderTypes(); changed();
+    if (b.dataset.act !== 'del') focusMoved('#stages', 'stage', b.dataset.act === 'up' ? Math.max(0, i - 1) : Math.min(S.length - 1, i + 1), b.dataset.act);
+  });
+  $('#addStage').addEventListener('click', () => insertStage(cfg.stages.length));
+
+  // Типы задач
+  $('#types').addEventListener('input', e => {
+    const el = e.target, row = el.closest('[data-type]');
+    if (!row || !el.dataset.k) return;
+    const t = cfg.types[+row.dataset.type], k = el.dataset.k;
+    if (k === 'name') { t.name = el.value; renamed(); renderRoles(); return; }
+    // Цвет меняется на лету, без перезапуска процесса.
+    if (k === 'color') {
+      t.color = el.value;
+      const live = st.cfg.types[+row.dataset.type]; if (live) live.color = el.value;
+      save(); dirty = true; return;
+    }
+    if (k === 'agents') { t.agents = el.checked; changed(); return; }
+    if (k === 'domain') { t.domain = el.value || null; renderDomains(); changed(); return; }
+    if (k === 'bugChance') { const v = parseFloat(el.value); if (!Number.isFinite(v) || v < 0) return; t.bugChance = Math.min(95, v); changed(); return; }
+    const v = parseFloat(el.value);
+    if (!Number.isFinite(v) || v < 0) return;
+    if (k === 'weight') {
+      t.weight = v;
+      const total = cfg.types.reduce((a, x) => a + (+x.weight || 0), 0) || 1;
+      document.querySelectorAll('#types [data-type]').forEach((r, j) => { r.querySelector('.pct').textContent = Math.round((+cfg.types[j].weight || 0) / total * 100) + '%'; });
+    } else if (k === 'sp') t.sp = v;
+    else { t.hours = t.hours || {}; t.hours[k.slice(2)] = v; }
+    changed();
+  });
+  $('#types').addEventListener('click', e => {
+    const b = e.target.closest('[data-act]'), row = e.target.closest('[data-type]');
+    if (!b || !row) return;
+    const i = +row.dataset.type, T = cfg.types;
+    if (b.dataset.act === 'del') {
+      if (T.length < 2 || T[i].id === F.BUG_ID) return; // Bug удалить нельзя
+      const [gone] = T.splice(i, 1);
+      cfg.roles.forEach(r => { if (Array.isArray(r.creates)) r.creates = r.creates.filter(x => x !== gone.id); });
+      renderRoles();
+      renderTypes(); changed(); return;
+    }
+    const j = b.dataset.act === 'up' ? i - 1 : i + 1;
+    if (j < 0 || j >= T.length) return;
+    [T[i], T[j]] = [T[j], T[i]];
+    renderTypes(); changed();
+    focusMoved('#types', 'type', j, b.dataset.act);
+  });
+  $('#addType').addEventListener('click', () => {
+    const base = cfg.types[0] || { hours: {} };
+    cfg.types.push({ id: uid('t'), name: 'Новый тип', weight: 1, hours: clone(base.hours || {}) });
+    renderTypes(); changed();
+    focusRow('#types tbody tr:last-child', true);
+  });
+
+  // После ↑/↓ — подсветить строку на новом месте и вернуть фокус на ту же кнопку.
+  function focusMoved(box, attr, i, act) {
+    const row = document.querySelector(`${box} [data-${attr}="${i}"]`);
+    if (!row) return;
+    row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash');
+    const btn = row.querySelector(`[data-act="${act}"]`);
+    (btn && !btn.disabled ? btn : row.querySelector('[data-k="name"]')).focus({ preventScroll: true });
+  }
+  // Перетаскивание строк: тянем за ⠿, синяя линия показывает место, отпускаем — строка встаёт туда.
+  function sortable(box, attr, list, done) {
+    let from = null;
+    const rowOf = e => e.target.closest(`[data-${attr}]`);
+    const clear = () => box.querySelectorAll('.drop-before, .drop-after').forEach(r => r.classList.remove('drop-before', 'drop-after'));
+    const place = (e, row) => { const r = row.getBoundingClientRect(); return e.clientY < r.top + r.height / 2; };
+    const stop = () => { from = null; clear(); box.querySelectorAll('.dragging').forEach(r => r.classList.remove('dragging')); };
+    box.addEventListener('dragstart', e => {
+      const row = e.target.closest('.grip') && rowOf(e);
+      if (!row) return;
+      from = +row.dataset[attr];
+      row.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', String(from));
+      if (e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(row, 16, 16);
+    });
+    box.addEventListener('dragover', e => {
+      const row = from != null && rowOf(e);
+      if (!row) return;
+      e.preventDefault();
+      clear();
+      row.classList.add(place(e, row) ? 'drop-before' : 'drop-after');
+    });
+    box.addEventListener('drop', e => {
+      const row = from != null && rowOf(e);
+      if (row) {
+        e.preventDefault();
+        const arr = list();
+        let to = +row.dataset[attr] + (place(e, row) ? 0 : 1);
+        if (to > from) to--;
+        if (to !== from) {
+          const [item] = arr.splice(from, 1);
+          arr.splice(to, 0, item);
+          stop(); done(to); return;
+        }
+      }
+      stop();
+    });
+    box.addEventListener('dragend', stop);
+  }
+  sortable($('#stages'), 'stage', () => cfg.stages, to => {
+    fixFirst(); renderStages(); renderTypes(); changed();
+    const row = document.querySelector(`#stages [data-stage="${to}"]`); if (row) { row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash'); }
+  });
+  sortable($('#team'), 'member', () => cfg.team, to => {
+    renderTeam(); changed();
+    const row = document.querySelector(`#team [data-member="${to}"]`); if (row) { row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash'); }
+  });
+  sortable($('#types'), 'type', () => cfg.types, to => {
+    renderTypes(); changed();
+    const row = document.querySelector(`#types [data-type="${to}"]`); if (row) { row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash'); }
+  });
+
+  // Схема и управление
+  function onFlowAct(e) {
+    const ins = e.target.closest('[data-ins]');
+    if (ins) { insertStage(+ins.dataset.ins); return; }
+    const nd = e.target.closest('[data-node]');
+    // Клик по очереди — сразу в её WIP-лимит, по этапу с ролью — в название.
+    if (nd) { const q = !st.cfg.stages[+nd.dataset.node].role; focusRow(`#stages [data-stage="${nd.dataset.node}"]`, q, q ? 'limit' : null); }
+  }
+  $('#flow').addEventListener('click', onFlowAct);
+  $('#flow').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onFlowAct(e); } });
+  $('#play').addEventListener('click', () => {
+    playing = !playing;
+    $('#play').textContent = playing ? '❚❚ Пауза' : '▶ Пуск';
+  });
+  $('#restart').addEventListener('click', () => restart());
+  $('#speed').addEventListener('change', e => { cfg.speed = +e.target.value; save(); });
+  window.addEventListener('resize', () => { velSig = ''; dirty = true; });
+  // Шапка или окно изменили размер — схема пересчитывает высоту, чтобы занять первый экран.
+  if (window.ResizeObserver) new ResizeObserver(() => { if (geo && flowHeight($('#flow svg').viewBox.baseVal.width) !== geo.H) renderFlow(); }).observe($('#flow'));
+  $('#reset').addEventListener('click', () => switchTo(EXAMPLE_KEY));
+
+  // Пресеты и JSON
+  $('#presetSel').addEventListener('change', e => switchTo(e.target.value));
+  $('#presetRename').addEventListener('click', () => {
+    const name = $('#presetName').value.trim(), p = loadPresets();
+    if (active === EXAMPLE_KEY || !name || name === active) return;
+    if (name in p) { presetMsg(`Пресет «${name}» уже есть, выберите другое название.`, true); return; }
+    const old = active;
+    delete p[old]; storePresets(p);
+    active = name; storeActive();
+    save();
+    presetMsg(`Пресет «${old}» переименован в «${name}».`);
+  });
+  $('#presetCopy').addEventListener('click', () => {
+    const p = loadPresets();
+    const name = uniqueName($('#presetName').value.trim() && $('#presetName').value.trim() !== active ? $('#presetName').value.trim() : `${active === EXAMPLE_KEY ? F.EXAMPLE.name : active} — копия`, p);
+    active = name; storeActive();
+    $('#presetName').blur();
+    save();
+    presetMsg(`Создан пресет «${name}», дальше правки идут в него.`);
+  });
+  // Удаление в два нажатия: первое спрашивает, второе удаляет.
+  let delArmed = false, delTimer = null;
+  $('#presetDel').addEventListener('click', () => {
+    const b = $('#presetDel');
+    if (active === EXAMPLE_KEY) return;
+    if (!delArmed) {
+      delArmed = true; b.textContent = 'Точно удалить?'; b.classList.add('warn');
+      clearTimeout(delTimer); delTimer = setTimeout(() => { delArmed = false; b.textContent = 'Удалить'; b.classList.remove('warn'); }, 3000);
+      return;
+    }
+    delArmed = false; b.textContent = 'Удалить'; b.classList.remove('warn');
+    const key = active, p = loadPresets();
+    delete p[key]; storePresets(p);
+    switchTo(EXAMPLE_KEY, `Пресет «${key}» удалён, загружен встроенный пример.`);
+  });
+  $('#jsonDownload').addEventListener('click', () => {
+    const name = cfg.name || 'настройки';
+    const slug = name.toLowerCase().replace(/[^a-zа-яё0-9]+/gi, '-').replace(/^-|-$/g, '') || 'devflow';
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(cfg, null, 2) + '\n'], { type: 'application/json' }));
+    a.download = `devflow-${slug}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    presetMsg(`Скачан файл ${a.download}.`);
+  });
+  $('#jsonFile').addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    f.text().then(text => {
+      const next = F.fromJSON(text);
+      active = uniqueName(next.name === 'Без названия' ? f.name.replace(/\.json$/i, '') : next.name, loadPresets());
+      storeActive();
+      useConfig(next, `Открыт файл ${f.name}, он сохранён как пресет «${active}».`);
+    }).catch(err => presetMsg(`Файл ${f.name} не подошёл: ${err.message}.`, true));
+  });
+  $('#jsonApply').addEventListener('click', () => {
+    try { $('#jsonText').blur(); useConfig(F.fromJSON($('#jsonText').value), 'JSON применён, процесс продолжается с новыми настройками.', true); }
+    catch (err) { presetMsg(`JSON не применён: ${err.message}.`, true); }
+  });
+  $('#jsonCopy').addEventListener('click', () => {
+    const ta = $('#jsonText');
+    navigator.clipboard.writeText(ta.value).then(() => presetMsg('JSON скопирован.')).catch(() => { ta.select(); presetMsg('Текст выделен, скопируйте его вручную.'); });
+  });
+
+  renderEditor();
+  renderPresets();
+  renderJson();
+  restart();
+  requestAnimationFrame(loop);
 })();
 </script>
 </body>

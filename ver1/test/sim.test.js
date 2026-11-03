@@ -42,3 +42,24 @@ test('перегрузка видна в аналитике', () => {
   const r = sim.simulate(cfg, 'A');
   assert.ok(r.wipEnd > r.wipStart * 2);
 });
+
+for (const which of ['A', 'B']) {
+  test(`переходы в кадрах сходятся с числом задач на этапах, сценарий ${which}`, () => {
+    const r = sim.simulate(EXAMPLE, which);
+    const n = r.stages.length;
+    assert.ok(r.stages.some(s => s.reworkTo >= 0), 'в примере должны быть возвраты');
+    const inStage = (f, i) => f.w[i] + f.k[i];
+    let done = 0;
+    for (let j = 1; j < r.frames.length; j++) {
+      const f = r.frames[j], p = r.frames[j - 1];
+      for (let i = 0; i < n; i++) {
+        let inflow = i === 0 ? f.arr - p.arr : f.mv[i - 1];
+        r.stages.forEach((s, k) => { if (s.reworkTo === i) inflow += f.rw[k]; });
+        const outflow = f.mv[i] + f.rw[i];
+        assert.strictEqual(inStage(f, i) - inStage(p, i), inflow - outflow, `кадр ${j}, этап ${r.stages[i].name}`);
+      }
+      done += f.mv[n - 1];
+    }
+    assert.strictEqual(done + r.frames[0].mv[n - 1], r.frames[r.frames.length - 1].done);
+  });
+}
