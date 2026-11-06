@@ -215,6 +215,8 @@
     const waitSum = new Array(n).fill(0), waitN = new Array(n).fill(0);
     const touchSum = new Array(n).fill(0), touchN = new Array(n).fill(0);
     const visitSum = new Array(n).fill(0);
+    // Переходы за интервал между кадрами: mv[s] — с этапа s дальше (с последнего в «Готово»), rw[s] — возврат с этапа s.
+    const mv = new Array(n).fill(0), rw = new Array(n).fill(0);
     let wipArea = 0, inSystem = 0, arrived = 0, doneCount = 0, lastT = 0, reworks = 0;
     const leads = [], leadsWork = [];
     let effortDone = 0, leadWorkDone = 0, doneInWin = 0, drainT = null, wipAtW0 = null;
@@ -273,8 +275,9 @@
       const ti = reworkTarget(sc, s, idx);
       if (ti >= 0) {
         const u = task.rng();
-        if (u < reworkProb(sc, s, ti)) { task.reworks++; enterStage(task, ti, t); return; }
+        if (u < reworkProb(sc, s, ti)) { task.reworks++; rw[s]++; enterStage(task, ti, t); return; }
       }
+      mv[s]++;
       if (s + 1 < n) enterStage(task, s + 1, t);
       else finishTask(task, t);
     }
@@ -328,7 +331,8 @@
 
     function snap(t) {
       if (wipAtW0 === null && t >= W0) wipAtW0 = inSystem;
-      frames.push({ t, w: waiting.slice(), k: working.slice(), done: doneCount, arr: arrived });
+      frames.push({ t, w: waiting.slice(), k: working.slice(), done: doneCount, arr: arrived, mv: mv.slice(), rw: rw.slice() });
+      mv.fill(0); rw.fill(0);
     }
 
     let nextSnap = 0, events = 0;
@@ -356,6 +360,7 @@
       frames,
       stages: sc.stages.map((s, i) => ({
         id: s.id, name: s.name, agentOn: s.agentOn,
+        reworkTo: reworkTarget(sc, i, idx),
         avgQueue: win > 0 ? qArea[i] / win : 0,
         avgWorking: win > 0 ? kArea[i] / win : 0,
         avgWait: waitN[i] ? waitSum[i] / waitN[i] : 0,
