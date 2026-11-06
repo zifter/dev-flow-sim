@@ -447,6 +447,7 @@ footer a { color: var(--accent-ink); }
       const rw = s.rework || { to: '', p: 20, pAgent: 25 };
       const ag = s.agent || { on: false, speed: 10, count: 2, oversight: 1, oversightPool: s.pool };
       const id = esc(s.id);
+      const ci = s.ci;
       return `
       <div class="stage" data-stage="${i}">
         <div class="stage-head">
@@ -456,8 +457,13 @@ footer a { color: var(--accent-ink); }
           <button class="icon-btn" type="button" data-act="down" title="Ниже" aria-label="Ниже"${i === n - 1 ? ' disabled' : ''}>↓</button>
           <button class="icon-btn" type="button" data-act="del" title="Удалить этап" aria-label="Удалить этап"${n < 2 ? ' disabled' : ''}>✕</button>
         </div>
-        <label class="field"><span>Кто делает</span><select id="st-pool-${id}" data-k="pool">${poolOptions(s.pool)}</select></label>
-        <div class="field"><span>Часов на задачу: мин · типично · макс</span>
+        <label class="check"><input type="checkbox" id="st-ci-${id}" data-k="ci.on"${ci ? ' checked' : ''}><span>CI/CD в облаке: очереди нет, агент не ускоряет</span></label>
+        ${ci ? `<div class="row3">
+          <label class="field"><span>Мощность, ×</span><input type="number" id="st-cipw-${id}" data-k="ci.power" min="1" step="1" value="${ci.power}"></label>
+          <label class="field"><span>$ за час ×1</span><input type="number" id="st-cipr-${id}" data-k="ci.pricePerHour" min="0" step="0.5" value="${ci.pricePerHour}"></label>
+          <label class="field"><span>Паралл., %</span><input type="number" id="st-cisc-${id}" data-k="ci.scalable" min="0" max="100" step="5" value="${ci.scalable}"></label>
+        </div>` : `<label class="field"><span>Кто делает</span><select id="st-pool-${id}" data-k="pool">${poolOptions(s.pool)}</select></label>`}
+        <div class="field"><span>${ci ? 'Часов на прогон при мощности ×1: мин · типично · макс' : 'Часов на задачу: мин · типично · макс'}</span>
           <div class="row3">
             <input type="number" id="st-min-${id}" data-k="min" min="0" step="0.25" value="${s.min}" aria-label="Минимум часов">
             <input type="number" id="st-mode-${id}" data-k="mode" min="0" step="0.25" value="${s.mode}" aria-label="Типично часов">
@@ -475,7 +481,7 @@ footer a { color: var(--accent-ink); }
             <input type="number" id="st-rwpa-${id}" data-k="rw.pAgent" min="0" max="99" step="1" value="${rw.pAgent ?? rw.p}" aria-label="Процент возвратов, если этап делал агент"${rw.to ? '' : ' disabled'}>
           </div>
         </div>` : ''}
-        <div class="agent" data-on="${!!ag.on}">
+        ${ci ? '' : `<div class="agent" data-on="${!!ag.on}">
           <label class="check"><input type="checkbox" id="st-agent-${id}" data-k="ag.on"${ag.on ? ' checked' : ''}><span>В сценарии B этап делает агент</span></label>
           <div class="agent-body">
             <div class="row3">
@@ -485,7 +491,7 @@ footer a { color: var(--accent-ink); }
             </div>
             <label class="field"><span>Кто ставит задачу агенту и проверяет результат</span><select id="st-agpool-${id}" data-k="ag.oversightPool">${poolOptions(ag.oversightPool)}</select></label>
           </div>
-        </div>
+        </div>`}
       </div>`;
     }).join('');
   }
@@ -497,7 +503,12 @@ footer a { color: var(--accent-ink); }
     const k = el.dataset.k;
     const val = el.type === 'number' ? parseFloat(el.value) : el.type === 'checkbox' ? el.checked : el.value;
     if (el.type === 'number' && !Number.isFinite(val)) return;
-    if (k.startsWith('rw.')) {
+    if (k === 'ci.on') {
+      s.ci = val ? { power: 1, pricePerHour: 2, scalable: 70 } : null;
+      renderStages();
+    } else if (k.startsWith('ci.')) {
+      if (s.ci) s.ci[k.slice(3)] = val;
+    } else if (k.startsWith('rw.')) {
       const f = k.slice(3);
       if (f === 'to') {
         s.rework = val ? Object.assign({ p: 20, pAgent: 25 }, s.rework || {}, { to: val }) : null;
@@ -601,6 +612,9 @@ footer a { color: var(--accent-ink); }
       ['Задач в работе одновременно', A.wipAvg, B.wipAvg, 1, -1],
       ['Эффективность потока (работа / срок)', A.flowEff * 100, B.flowEff * 100, 0, 1, '%'],
       ['Возвратов на задачу', A.reworksPerTask, B.reworksPerTask, 2, -1],
+      ['CI/CD, $ в неделю', A.ci.costPerWeek, B.ci.costPerWeek, 0, -1],
+      ['CI/CD, $ на задачу', A.ci.costPerTask, B.ci.costPerTask, 2, -1],
+      ['CI/CD, прогонов на задачу', A.ci.runs / (A.doneInWin || 1), B.ci.runs / (B.doneInWin || 1), 2, -1],
     ];
     if (!flow) kpi.splice(1, 0, ['Бэклог разобран за, дн', A.drainT == null ? NaN : A.drainT / 24, B.drainT == null ? NaN : B.drainT / 24, 1, -1]);
     const delta = (a, b, d, dir, unit) => {
@@ -825,7 +839,7 @@ footer a { color: var(--accent-ink); }
           <div class="board" style="--cols:${n + 1}" data-board="${w}">
             ${r.stages.map((s, i) => {
               const st = cfg.stages[i];
-              const who = s.agentOn ? `агенты ×${st.agent.speed} · проверка: ${poolName(st.agent.oversightPool)}` : poolName(st.pool);
+              const who = st.ci ? `облако · мощность ×${st.ci.power}` : s.agentOn ? `агенты ×${st.agent.speed} · проверка: ${poolName(st.agent.oversightPool)}` : poolName(st.pool);
               return `<div class="col${th.bottleneckStages[i] ? ' bn' : ''}">
                 <div class="col-h"><b>${esc(s.name)}</b><span>${esc(who)}</span></div>
                 <div class="lane"><div class="lane-l">ждут <span class="num" data-n="w${i}"></span></div><div class="dots" data-d="w${i}"></div></div>
